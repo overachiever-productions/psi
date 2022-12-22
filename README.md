@@ -1,2 +1,1 @@
-# psi
-PowerShell Sql Interface
+# psi - PowerShell Sql Interface
