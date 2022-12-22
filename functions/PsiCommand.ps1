@@ -177,18 +177,7 @@ function Invoke-PsiCommand {
 	);
 	
 	# Parameter Validation: 
-	# Only 1x of AsXyz can be true at a time. So put them in an array and count # of them that are true... if it's > 1... throw... 
-	
-	
-	#MVP Hack: 
-	if ("." -eq $SqlInstance) {
-		$SqlInstance = "dev.sqlserver.id";
-	}
-	#MVP Hack: 
-	if ($null -eq $Credentials) {
-		$password = ConvertTo-SecureString 'Pass@word1' -AsPlainText -Force
-		$Credentials = New-Object System.Management.Automation.PSCredential('sa', $password);
-	}
+	# Only 1x of -AsXyz can be true at a time. So put them in an array and count # of them that are true... if it's > 1... throw... 
 	
 	$provider = $Framework;
 	if ($provider -eq "AUTO") {
