@@ -1,5 +1,9 @@
 ﻿Set-StrictMode -Version 3.0;
 
+# 1. Import CLR Objects:
+. "$PSScriptRoot\psi.meta.ps1"
+Import-PsiTypes;
+
 # Import Funcs/etc. 
 foreach ($file in (@(Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath 'functions/*.ps1') -Recurse -ErrorAction Stop))) {
 	try {
@@ -10,5 +14,5 @@ foreach ($file in (@(Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPa
 	}
 }
 
-# Export the main func:
-Export-ModuleMember -Function Invoke-PsiCommand;
+# Export Psi Funcs:
+Export-ModuleMember -Function *-Psi*;

@@ -105,6 +105,7 @@ function Invoke-PsiQuery {
 		[string]$Database = "master",
 		[string]$Query,
 		[PSCredential]$Credentials,
+
 		[string]$ConnectionString,
 		[int]$ConnectionTimeout = -1,
 		[int]$QueryTimeout = -1,
@@ -160,11 +161,10 @@ function Invoke-PsiCommand {
 		[string]$SqlInstance = ".",
 		[string]$Database = "master",
 		[string]$Query,
-		[string]$SprocName,
-		# either $SprocName or $Query is populated - not BOTH. And ... obviously, if $SprocName then... $cmd.CommandType = ... sproc.
+		[string]$SprocName, # either $SprocName or $Query is populated - not BOTH. And ... obviously, if $SprocName then... $cmd.CommandType = ... sproc.
 		[PSCredential]$Credentials,
-		[string]$ConnectionString,
-		# optional... overwrites other stuff..
+		[PSI.Models.ParameterSet]$Parameters = $null,
+		[string]$ConnectionString,  # optional... overwrites other stuff..
 		[int]$ConnectionTimeout = -1,
 		[int]$QueryTimeout = -1,
 		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
@@ -198,6 +198,10 @@ function Invoke-PsiCommand {
 		
 		if ($ConnectionTimeout -gt 0) {
 			$cmd.CommandTimeout = $ConnectionTimeout;
+		}
+		
+		if ($Parameters) {
+			Bind-Parameters -Framework $provider -Command $cmd -Parameters $Parameters;
 		}
 		
 		$dataSet = New-Object System.Data.DataSet;
