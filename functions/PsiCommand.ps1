@@ -220,12 +220,11 @@ function Invoke-PsiCommand {
 	}
 	catch {
 		# TODO: look at options for handling SQL errors ... i.e., silentlycontinue? output? or stop/throw?
-		throw "OPERATION error: $_ "; #TODO: embellis this MVP implementation ... i.e., this error handling sucks... 
+		throw "OPERATION error: $_ "; #TODO: embellish this MVP implementation ... i.e., this error handling sucks... 
 	}
 	finally {
 		$conn.Close();
 	}
-	
 	
 	if ($dataSet.Tables.Count -gt 1) {
 		return $dataSet; # multiple tables (result-sets) - output the entire data set.
