@@ -18,9 +18,13 @@
 			j.[name] = @JobName; ";
 
 	$query = "SELECT [name] FROM sys.databases WHERE [database_id] = @id";
+	Add-PsiParameter -Direction Return;
 	Add-PsiParameter -Name "id" -Type "Int" -Value 11;
 
-	Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -Credentials (Get-Credential sa) -Query $query -Parameters $parameters;
+$parameters;
+
+
+	Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -Credentials (Get-Credential sa) -Query $query -Parameters $parameters -Provider SQLClient;
 	
 
 #>
@@ -88,7 +92,7 @@ function Add-PsiParameter {
 		}
 	}
 	
-	$pType = [PSI.Models.PseType]::NotSet;
+	$pType = [PSI.Models.PsiType]::NotSet;
 	if (-not ([string]::IsNullOrEmpty($Type))) {
 		try {
 			$pType = [PSI.Models.Mapper]::GetPsiType($Type);
@@ -212,6 +216,8 @@ filter Bind-Parameters {
 		[PSI.Models.ParameterSet]$Parameters
 	);
 	
+	# Jackpot: These are the core docs I need: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
+	
 	switch ($Framework) {
 		"ODBC"	 {
 			foreach ($parameter in $Parameters.Parameters) {
@@ -250,10 +256,10 @@ filter Bind-OdbcParameter {
 		[PSI.Models.Parameter]$Parameter
 	);
 	
-	if ("Return" -eq $Parameter.Direction) {
-		# not sure what to do here or... if this EVEN 'needs' any special handling. 
-		throw "RETURN PARAM binding not implemented yet. Not sure it even needs anything speciall... but, wahtever... "
-	}
+#	if ("Return" -eq $Parameter.Direction) {
+#		# not sure what to do here or... if this EVEN 'needs' any special handling. 
+#		throw "RETURN PARAM binding not implemented yet. Not sure it even needs anything speciall... but, wahtever... "
+#	}
 	
 	if ($Parameter.Direction -notin @("Input", "InputOutput", "Output", "Return")) {
 		throw "Psi Framwork Error. Invalid PsiParameter Direction Specified.";
@@ -303,8 +309,14 @@ filter Bind-OdbcParameter {
 			# TODO: verifi that this is correct:
 			$type = [System.Data.Odbc.OdbcType]::Double;
 		}
-
+		"Real" {
+			# TODO: group with others that make sense... 
+			$type = [System.Data.Odbc.OdbcType]::Real;
+		}
+		
 		"DateTime2" {
+			# Fodder: https://learn.microsoft.com/en-us/sql/relational-databases/native-client-odbc-date-time/enhanced-date-and-time-type-behavior-with-previous-sql-server-versions-odbc?view=sql-server-ver16 
+			# Fodder: https://stackoverflow.com/questions/1334143/datetime2-vs-datetime-in-sql-server 
 			# TODO: need to figure out how to specify this... 
 			$type = [System.Data.Odbc.OdbcType]::DateTime;
 		}
@@ -354,20 +366,6 @@ filter Bind-OdbcParameter {
 	$Command.Parameters.Add($added) | Out-Null;
 }
 
-#filter New-OdbcParameter {
-#	[OutputType([System.Data.Odbc.OdbcParameter])]
-#	param (
-#		[string]$Name,
-#		[System.Data.Odbc.OdbcType]$Type,
-#		[System.Data.ParameterDirection]$Direction
-#	);
-#	
-#	$output = New-Object System.Data.Odbc.OdbcParameter($Name, $Type);
-#	$output.Direction = $Direction;
-#	
-#	return $output;
-#}
-
 filter Bind-OleDbParameter {
 	param (
 		[Parameter(Mandatory)]
@@ -376,7 +374,149 @@ filter Bind-OleDbParameter {
 		[PSI.Models.Parameter]$Parameter
 	);
 	
-
+	if ("Return" -eq $Parameter.Direction) {
+		# not sure what to do here or... if this EVEN 'needs' any special handling. 
+		throw "RETURN PARAM binding not implemented yet. Not sure it even needs anything speciall... but, wahtever... "
+	}
+	
+	if ($Parameter.Direction -notin @("Input", "InputOutput", "Output", "Return")) {
+		throw "Psi Framwork Error. Invalid PsiParameter Direction Specified.";
+	}
+	
+	$direction = ConvertTo-SystemParameterDirection -Direction $Parameter.Direction;
+	[int]$size = $null;
+	[int]$precision = $null;
+	[int]$scale = $null;
+	
+	switch ($Parameter.Type) {
+		"NotSet" {
+			throw "Psi Framwork Error. PsiType has not been correctly set.";
+		}
+		"Char" {
+			$type = [System.Data.OleDb.OleDbType]::Char;
+		}
+		"Varchar" {
+			$type = [System.Data.OleDb.OleDbType]::VarChar;
+		}
+		"VarcharMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarChar;
+		}
+		"NChar" {
+			$type = [System.Data.OleDb.OleDbType]::WChar;
+		}
+		"NVarchar" {
+			$type = [System.Data.OleDb.OleDbType]::VarWChar;
+		}
+		"NVarcharMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarWChar;
+		}
+		"Binary" {
+			$type = [System.Data.OleDb.OleDbType]::Binary;
+		}
+		"Varbinary" {
+			$type = [System.Data.OleDb.OleDbType]::VarBinary;
+		}
+		"VarbinaryMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarBinary;
+		}
+		"Bit" {
+			$type = [System.Data.OleDb.OleDbType]::Boolean;
+		}
+		"TinyInt" {
+			$type = [System.Data.OleDb.OleDbType]::TinyInt;
+		}
+		"SmallInt" {
+			$type = [System.Data.OleDb.OleDbType]::SmallInt;
+		}
+		"Int" {
+			$type = [System.Data.OleDb.OleDbType]::Integer;
+		}
+		"BigInt" {
+			$type = [System.Data.OleDb.OleDbType]::BigInt;
+		}
+		"Decimal" {
+			$type = [System.Data.OleDb.OleDbType]::Decimal;
+		}
+		"Numeric" {
+			$type = [System.Data.OleDb.OleDbType]::Numeric;
+		}
+		"SmallMoney" {
+		}
+		"Money" {
+			$type = [System.Data.OleDb.OleDbType]::Currency;
+		}
+		"Float" {
+		}
+		"Date" {
+			$type = [System.Data.OleDb.OleDbType]::DBDate;
+		}
+		"Time" {
+			$type = [System.Data.OleDb.OleDbType]::DBTime;
+		}
+		"SmallDateTime" {
+			# hmmm... 
+			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
+		}
+		"DateTime" {
+			# hmmmm... 
+			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
+		}
+		"DateTime2" {
+			# hmmm.
+			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
+		}
+		"DateTimeOffset" {
+		}
+		"UniqueIdentifier" {
+			$type = [System.Data.OleDb.OleDbType]::Guid;
+		}
+		"Image" {
+			#hmmmm.
+		}
+		"Text" {
+			#hmmmm.
+		}
+		"NText" {
+			#hmmmm.
+		}
+		"SqlVariant" {
+			# TODO: test this out... 
+			$type = [System.Data.OleDb.OleDbType]::Variant;
+		}
+		"Geometry" {
+		}
+		"Geography" {
+		}
+		"TimeStamp" {
+		}
+		"Xml" {
+		}
+		"Sysname" {
+			$type = [System.Data.OleDb.OleDbType]::VarWChar;
+			$size = 256;
+		}
+		default {
+			throw "not valid PsiType... no mapping could be made.";
+		}
+	}
+	
+	$added = New-Object System.Data.OleDb.OleDbParameter($Parameter.Name, $type);
+	$added.Direction = $direction;
+	
+	if ($Parameter.Value) {
+		$added.Value = $Parameter.Value;
+	}
+	
+	if ($size) {
+		$added.Size = $size;
+	}
+	
+	if ($precision) {
+		$added.Precision = $precision;
+		$added.Scale = $scale;
+	}
+	
+	$Command.Parameters.Add($added) | Out-Null;
 }
 
 filter Bind-SqlClientParameter {
@@ -387,7 +527,160 @@ filter Bind-SqlClientParameter {
 		[PSI.Models.Parameter]$Parameter
 	);
 	
+	if ("Return" -eq $Parameter.Direction) {
+		# not sure what to do here or... if this EVEN 'needs' any special handling. 
+		throw "RETURN PARAM binding not implemented yet. Not sure it even needs anything speciall... but, wahtever... "
+	}
 	
+	if ($Parameter.Direction -notin @("Input", "InputOutput", "Output", "Return")) {
+		throw "Psi Framwork Error. Invalid PsiParameter Direction Specified.";
+	}
+	
+	$direction = ConvertTo-SystemParameterDirection -Direction $Parameter.Direction;
+	[int]$size = $null;
+	[int]$precision = $null;
+	[int]$scale = $null;
+	
+	switch ($Parameter.Type) {
+		"NotSet" {
+			throw "Psi Framwork Error.";
+		}
+		"Char" {
+			$type = [System.Data.SqlDbType]::Char;
+		}
+		"Varchar" {
+			$type = [System.Data.SqlDbType]::VarChar;
+		}
+		"VarcharMax" {
+			$type = [System.Data.SqlDbType]::VarChar;
+			$size = -1;
+		}
+		"NChar" {
+			$type = [System.Data.SqlDbType]::NChar;
+		}
+		"NVarchar" {
+			$type = [System.Data.SqlDbType]::NVarChar;
+		}
+		"NVarcharMax" {
+			$type = [System.Data.SqlDbType]::NVarChar;
+			$size = -1;
+		}
+		"Binary" {
+			$type = [System.Data.SqlDbType]::Binary;
+		}
+		"Varbinary" {
+			$type = [System.Data.SqlDbType]::VarBinary;
+		}
+		"VarbinaryMax" {
+			$type = [System.Data.SqlDbType]::VarBinary;
+			$size = -1;
+		}
+		"Bit" {
+			$type = [System.Data.SqlDbType]::Bit;
+		}
+		"TinyInt" {
+			$type = [System.Data.SqlDbType]::TinyInt;
+		}
+		"SmallInt" {
+			$type = [System.Data.SqlDbType]::SmallInt;
+		}
+		"Int" {
+			$type = [System.Data.SqlDbType]::Int;
+		}
+		"BigInt" {
+			$type = [System.Data.SqlDbType]::BigInt;
+		}
+		"Decimal" {
+			$type = [System.Data.SqlDbType]::Decimal;
+		}
+		"Numeric" {
+			# hmmm. No explicit mapping. Decimal should be JUST FINE in this SPECIFIC case. 
+			$type = [System.Data.SqlDbType]::Decimal;
+		}
+		"SmallMoney" {
+			$type = [System.Data.SqlDbType]::SmallMoney;
+		}
+		"Money" {
+			$type = [System.Data.SqlDbType]::Money;
+		}
+		"Float" {
+			$type = [System.Data.SqlDbType]::Float;
+		}
+		"Date" {
+			$type = [System.Data.SqlDbType]::Date;
+		}
+		"Time" {
+			$type = [System.Data.SqlDbType]::Time;
+		}
+		"SmallDateTime" {
+			$type = [System.Data.SqlDbType]::SmallDateTime;
+		}
+		"DateTime" {
+			$type = [System.Data.SqlDbType]::DateTime;
+		}
+		"DateTime2" {
+			$type = [System.Data.SqlDbType]::DateTime2;
+			$size = $Parameter.Size;
+		}
+		"DateTimeOffset" {
+			$type = [System.Data.SqlDbType]::DateTimeOffset;
+		}
+		"UniqueIdentifier" {
+			$type = [System.Data.SqlDbType]::UniqueIdentifier;
+		}
+		"Image" {
+			$type = [System.Data.SqlDbType]::Image;
+		}
+		"Text" {
+			$type = [System.Data.SqlDbType]::Text;
+		}
+		"NText" {
+			$type = [System.Data.SqlDbType]::NText;
+		}
+		"SqlVariant" {
+			$type = [System.Data.SqlDbType]::Variant;
+		}
+		"Geometry" {
+			# hmmmm?
+			$type = [System.Data.SqlDbType]::Structured;
+		}
+		"Geography" {
+			# hmmmm?
+			$type = [System.Data.SqlDbType]::Structured;
+		}
+		"TimeStamp" {
+			$type = [System.Data.SqlDbType]::Timestamp;
+		}
+		"Xml" {
+			# interesting... 
+			$type = [System.Data.SqlDbType]::Xml;
+		}
+		"Sysname" {
+			$type = [System.Data.SqlDbType]::NVarChar;
+			$size = 256;
+		}
+		default {
+			throw "not valid PsiType... no mapping could be made.";
+		}
+	}
+	
+	$added = New-Object System.Data.SqlClient.SqlParameter($Parameter.Name, $type);
+	$added.Direction = $direction;
+	
+	if ($Parameter.Value) {
+		$added.Value = $Parameter.Value;
+	}
+	
+	if ($size) {
+		$added.Size = $size;
+	}
+	
+	if ($precision) {
+		$added.Precision = $precision;
+		$added.Scale = $scale;
+	}
+	
+	$Command.Parameters.Add($added) | Out-Null;
 }
 
 filter ConvertTo-SystemParameterDirection {
@@ -499,88 +792,6 @@ filter ConvertTo-SystemParameterDirection {
 #			# hmmm... so... do i modify the .Size via this func as well? think i should... 
 #			# or... I could do the $Command.Add... right friggin here... in which case... i don't need to have a separate func... i.e., roll this up into the 'caller'?
 #			return [System.Data.Odbc.OdbcType]::NVarChar;
-#		}
-#		default {
-#			throw "not valid PsiType... no mapping could be made.";
-#		}
-#	}
-#}
-#
-#filter Get-OledbType {
-#	param (
-#		[PSI.Models.PsiType]$Type
-#	);
-#	
-#	switch ($Type) {
-#		"NotSet" {
-#		}
-#		"Char" {
-#		}
-#		"Varchar" {
-#		}
-#		"VarcharMax" {
-#		}
-#		"NChar" {
-#		}
-#		"NVarchar" {
-#		}
-#		"NVarcharMax" {
-#		}
-#		"Binary" {
-#		}
-#		"Varbinary" {
-#		}
-#		"VarbinaryMax" {
-#		}
-#		"TinyInt" {
-#		}
-#		"SmallInt" {
-#		}
-#		"Int" {
-#		}
-#		"BigInt" {
-#		}
-#		"Decimal" {
-#		}
-#		"Numeric" {
-#		}
-#		"SmallMoney" {
-#		}
-#		"Money" {
-#		}
-#		"Float" {
-#		}
-#		"Date" {
-#		}
-#		"Time" {
-#		}
-#		"SmallDateTime" {
-#		}
-#		"DateTime" {
-#		}
-#		"DateTime2" {
-#		}
-#		"DateTimeOffset" {
-#		}
-#		"UniqueIdentifier" {
-#		}
-#		"Image" {
-#		}
-#		"Text" {
-#		}
-#		"NText" {
-#		}
-#		"SqlVariant" {
-#		}
-#		"Geometry" {
-#		}
-#		"Geography" {
-#		}
-#		"TimeStamp" {
-#		}
-#		"Xml" {
-#		}
-#		"Sysname" {
 #		}
 #		default {
 #			throw "not valid PsiType... no mapping could be made.";
