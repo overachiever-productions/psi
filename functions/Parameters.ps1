@@ -400,32 +400,8 @@ filter Bind-OleDbParameter {
 		"NotSet" {
 			throw "Psi Framwork Error. PsiType has not been correctly set.";
 		}
-		"Char" {
-			$type = [System.Data.OleDb.OleDbType]::Char;
-		}
-		"Varchar" {
-			$type = [System.Data.OleDb.OleDbType]::VarChar;
-		}
-		"VarcharMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarChar;
-		}
-		"NChar" {
-			$type = [System.Data.OleDb.OleDbType]::WChar;
-		}
-		"NVarchar" {
-			$type = [System.Data.OleDb.OleDbType]::VarWChar;
-		}
-		"NVarcharMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarWChar;
-		}
-		"Binary" {
-			$type = [System.Data.OleDb.OleDbType]::Binary;
-		}
-		"Varbinary" {
-			$type = [System.Data.OleDb.OleDbType]::VarBinary;
-		}
-		"VarbinaryMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarBinary;
+		{ $_ -in @("SmallInt", "BigInt", "Decimal", "Numeric")} {
+			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
 		}
 		"Bit" {
 			$type = [System.Data.OleDb.OleDbType]::Boolean;
@@ -433,22 +409,29 @@ filter Bind-OleDbParameter {
 		"TinyInt" {
 			$type = [System.Data.OleDb.OleDbType]::UnsignedTinyInt;
 		}
-		"SmallInt" {
-			$type = [System.Data.OleDb.OleDbType]::SmallInt;
-		}
 		"Int" {
 			$type = [System.Data.OleDb.OleDbType]::Integer;
 		}
-		"BigInt" {
-			$type = [System.Data.OleDb.OleDbType]::BigInt;
+		{ $_ -in @("Char", "Varchar", "Binary", "Varbinary")} {
+			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
+			$size = $Parameter.Size;
 		}
-		"Decimal" {
-			$type = [System.Data.OleDb.OleDbType]::Decimal;
+		"VarcharMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarChar;
 		}
-		"Numeric" {
-			$type = [System.Data.OleDb.OleDbType]::Numeric;
+		"NChar" {
+			$type = [System.Data.OleDb.OleDbType]::WChar;
+			$size = $Parameter.Size;
 		}
-		"SmallMoney" {
+		"NVarchar" {
+			$type = [System.Data.OleDb.OleDbType]::VarWChar;
+			$size = $Parameter.Size;
+		}
+		"NVarcharMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarWChar;
+		}
+		"VarbinaryMax" {
+			$type = [System.Data.OleDb.OleDbType]::LongVarBinary;
 		}
 		"Money" {
 			$type = [System.Data.OleDb.OleDbType]::Currency;
@@ -465,15 +448,16 @@ filter Bind-OleDbParameter {
 		"Time" {
 			$type = [System.Data.OleDb.OleDbType]::DBTime;
 		}
+		"SmallMoney" {
+			# TODO: see if mapping as Currency works... 
+		}
 		"SmallDateTime" {
-			# hmmm... 
 			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
 		}
 		"DateTime" {
 			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
 		}
 		"DateTime2" {
-			# hmmm.
 			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
 		}
 		"DateTimeOffset" {
@@ -562,91 +546,22 @@ filter Bind-SqlClientParameter {
 		"NotSet" {
 			throw "Psi Framwork Error.";
 		}
-		"Char" {
-			$type = [System.Data.SqlDbType]::Char;
+		{ $_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float", 
+				"Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier") } {
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
 		}
-		"Varchar" {
-			$type = [System.Data.SqlDbType]::VarChar;
-		}
-		"VarcharMax" {
-			$type = [System.Data.SqlDbType]::VarChar;
-			$size = -1;
-		}
-		"NChar" {
-			$type = [System.Data.SqlDbType]::NChar;
-		}
-		"NVarchar" {
-			$type = [System.Data.SqlDbType]::NVarChar;
-		}
-		"NVarcharMax" {
-			$type = [System.Data.SqlDbType]::NVarChar;
-			$size = -1;
-		}
-		"Binary" {
-			$type = [System.Data.SqlDbType]::Binary;
-		}
-		"Varbinary" {
-			$type = [System.Data.SqlDbType]::VarBinary;
-		}
-		"VarbinaryMax" {
-			$type = [System.Data.SqlDbType]::VarBinary;
-			$size = -1;
-		}
-		"Bit" {
-			$type = [System.Data.SqlDbType]::Bit;
-		}
-		"TinyInt" {
-			$type = [System.Data.SqlDbType]::TinyInt;
-		}
-		"SmallInt" {
-			$type = [System.Data.SqlDbType]::SmallInt;
-		}
-		"Int" {
-			$type = [System.Data.SqlDbType]::Int;
-		}
-		"BigInt" {
-			$type = [System.Data.SqlDbType]::BigInt;
-		}
-		"Decimal" {
-			$type = [System.Data.SqlDbType]::Decimal;
-		}
-		"Numeric" {
-			# hmmm. No explicit mapping. Decimal should be JUST FINE in this SPECIFIC case. 
-			$type = [System.Data.SqlDbType]::Decimal;
-		}
-		"SmallMoney" {
-			$type = [System.Data.SqlDbType]::SmallMoney;
-		}
-		"Money" {
-			$type = [System.Data.SqlDbType]::Money;
-		}
-		"Float" {
-			$type = [System.Data.SqlDbType]::Float;
-		}
-		"Real" {
-			$type = [System.Data.SqlDbType]::Real;
-		}
-		"Date" {
-			$type = [System.Data.SqlDbType]::Date;
-		}
-		"Time" {
-			$type = [System.Data.SqlDbType]::Time;
-		}
-		"SmallDateTime" {
-			$type = [System.Data.SqlDbType]::SmallDateTime;
-		}
-		"DateTime" {
-			$type = [System.Data.SqlDbType]::DateTime;
-		}
-		"DateTime2" {
-			$type = [System.Data.SqlDbType]::DateTime2;
+		{ $_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2") } {
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
 			$size = $Parameter.Size;
+		}		
+		{ $_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax") } {
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
+			$size = -1;
 		}
-		"DateTimeOffset" {
-			$type = [System.Data.SqlDbType]::DateTimeOffset;
-		}
-		"UniqueIdentifier" {
-			$type = [System.Data.SqlDbType]::UniqueIdentifier;
+		{ $_ -in @("Decimal", "Numeric") } {
+			$type = [System.Data.SqlDbType]::Decimal;
+			$precision = $Parameter.Precision;
+			$scale = $Parameter.Scale;
 		}
 		"Image" {
 			$type = [System.Data.SqlDbType]::Image;
@@ -661,18 +576,15 @@ filter Bind-SqlClientParameter {
 			$type = [System.Data.SqlDbType]::Variant;
 		}
 		"Geometry" {
-			# hmmmm?
 			$type = [System.Data.SqlDbType]::Structured;
 		}
 		"Geography" {
-			# hmmmm?
 			$type = [System.Data.SqlDbType]::Structured;
 		}
 		"TimeStamp" {
 			$type = [System.Data.SqlDbType]::Timestamp;
 		}
 		"Xml" {
-			# interesting... 
 			$type = [System.Data.SqlDbType]::Xml;
 		}
 		"Sysname" {
