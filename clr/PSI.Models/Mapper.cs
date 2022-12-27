@@ -6,7 +6,7 @@ namespace PSI.Models
     public class Mapper
     {
         // Refactor: MapType() instead of GetPType?
-        public static PsiType GetPType(string input)
+        public static PsiType GetPsiType(string input)
         {
             // final param in Enum.Parse is to IGNORE case sensitivity. 
             return (PsiType)Enum.Parse(typeof(PsiType), input, true);

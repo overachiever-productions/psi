@@ -23,6 +23,7 @@
         SmallMoney,
         Money,
         Float,
+        Real,  
         Date,
         Time,
         SmallDateTime,
