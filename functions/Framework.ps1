@@ -84,7 +84,7 @@ function Get-ConnectionString {
 		[string]$Framework = "ODBC",
 		[string]$Server = $null,
 		[string]$Database = $null,
-		[PSCredential]$Credentials = $null,
+		[PSCredential]$SqlCredential = $null,
 		[string]$ConnectionString = $null
 	);
 	
@@ -94,30 +94,30 @@ function Get-ConnectionString {
 	}
 	
 	$user, $pass = $null;
-	if ($Credentials) {
-		$user = $Credentials.UserName;
-		$pass = $Credentials.GetNetworkCredential().Password;
+	if ($SqlCredential) {
+		$user = $SqlCredential.UserName;
+		$pass = $SqlCredential.GetNetworkCredential().Password;
 	}
 	
 	# otherwise, time to build-up a connection-string from the info provided.
 	switch ($Framework) {
 		"ODBC" {
 			# MVP implementation:
-			if ($Credentials) {
+			if ($SqlCredential) {
 				return "Driver={ODBC Driver 17 for SQL Server}; Server=$Server; Database=$Database; UID=$user; PWD=$pass;";
 			}
 			return "Driver={ODBC Driver 17 for SQL Server}; Server=$Server; Database=$Database; Trusted_Connection=yes;";
 		}
 		"OLEDB" {
 			# MVP implementation:
-			if ($Credentials) {
+			if ($SqlCredential) {
 				return "Provider=MSOLEDBSQL; Data Source=$Server; Persist Security Info=True; Trusted_Connection=yes; Initial Catalog=$Database;";
 			}
 			return "Provider=MSOLEDBSQL; Data Source=$Server; Persist Security Info=True; User ID=$user; Password=$pass; Initial Catalog=$Database;";
 		}
 		"SQLClient" {
 			# MVP implementation:
-			if ($Credentials) {
+			if ($SqlCredential) {
 				
 			}
 			return "Data Source=$Server; Persist Security Info=True; User ID=$user; Password=$pass;Initial Catalog=$Database;";
@@ -173,5 +173,3 @@ function Get-ConnectionStringBuilder {
 	
 	
 }
-
-

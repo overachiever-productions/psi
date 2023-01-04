@@ -1,6 +1,7 @@
 ﻿Set-StrictMode -Version 1.0;
 
-function Import-PsiTypes {
+# WARN: don't call this Import-PsiTypes (which'd make sense) ... cuz... that'll EXPORT the method.
+function Import-Types {
 	param (
 		[string]$ScriptRoot = $PSScriptRoot
 	);
@@ -11,7 +12,7 @@ function Import-PsiTypes {
 		"$ScriptRoot\clr\PSI.Models\Parameter.cs"
 		"$ScriptRoot\clr\PSI.Models\ParameterSet.cs"
 		"$ScriptRoot\clr\PSI.Models\ParameterSetManager.cs"
-		"$ScriptRoot\clr\PSI.Models\Mapper.cs"
+		"$ScriptRoot\clr\PSI.Models\PsiMapper.cs"
 	);
 	
 	Add-Type -Path $classFiles;

@@ -2,7 +2,7 @@
 
 # 1. Import CLR Objects:
 . "$PSScriptRoot\psi.meta.ps1"
-Import-PsiTypes;
+Import-Types;
 
 # Import Funcs/etc. 
 foreach ($file in (@(Get-ChildItem -Path (Join-Path -Path $PSScriptRoot -ChildPath 'functions/*.ps1') -Recurse -ErrorAction Stop))) {

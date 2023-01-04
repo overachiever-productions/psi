@@ -3,7 +3,7 @@
 namespace PSI.Models
 {
     // Fodder: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/data-type-mappings-in-ado-net
-    public class Mapper
+    public class PsiMapper
     {
         // Refactor: MapType() instead of GetPType?
         public static PsiType GetPsiType(string input)
