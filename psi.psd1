@@ -4,7 +4,7 @@
 	RootModule = 'psi.psm1'
 	
 	# Version number of this module.
-	ModuleVersion = '0.1.0'
+	ModuleVersion = '0.2.0'
 	
 	# ID used to uniquely identify this module
 	GUID = '0ef30001-2e21-469e-95bc-50261ea2f8e6'
@@ -22,7 +22,7 @@
 	Description = 'Module description'
 	
 	# Minimum version of the Windows PowerShell engine required by this module
-	PowerShellVersion = '5.0'
+	PowerShellVersion = '3.0'
 	
 	# Name of the Windows PowerShell host required by this module
 	PowerShellHostName = ''
