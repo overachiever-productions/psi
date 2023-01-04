@@ -30,17 +30,22 @@ $parameters;
 #>
 
 $global:PsiParameterManager = [PSI.Models.ParameterSetManager]::Instance;
-$global:PsiDefaultParameterSetName = "{DEFAULT}";
+$global:PsiDefaultParameterSetName = "_DEFAULT";
 $global:PsiSizeableParameterTypes = @("char", "varchar", "Nchar", "Nvarchar", "binary", "varbinary", "datetime2");
 
 filter New-PsiParameterSet {
 	param (
-		[string]$Name = $global:PsiDefaultParameterSetName
+		[string]$Name = $global:PsiDefaultParameterSetName,
+		[switch]$OverwriteExisting = $true
 	);
+	
+	if ($OverwriteExisting) {
+		$global:PsiParameterManager.RemoveParameterSet($Name);
+	}
 	
 	if ($global:PsiParameterManager.ParameterSets.ContainsKey($Name)) {
 		if ($global:PsiDefaultParameterSetName -eq $Name) {
-			throw "A DEFAULT PsiParameterSet already exists. To create a New or Additional ParameterSet, specify a name via the -Name parameter.";
+			throw "A DEFAULT PsiParameterSet already exists. To create an additional ParameterSet, specify a name via the -Name parameter.";
 		}
 		else {
 			throw "A PsiParameterSet with the name of [$Name] alrerady exists. Please specify a distinct -Name value for each ParameterSet.";
@@ -85,7 +90,7 @@ function Add-PsiParameter {
 	$pDirection = [PSI.Models.PDirection]::NotSet;
 	if (-not ([string]::IsNullOrEmpty($Direction))) {
 		try {
-			$pDirection = [PSI.Models.Mapper]::GetPDirection($Direction);
+			$pDirection = [PSI.Models.PsiMapper]::GetPDirection($Direction);
 		}
 		catch {
 			throw "Invalid Direction [$Direction]. Error: $_ ";
@@ -95,7 +100,7 @@ function Add-PsiParameter {
 	$pType = [PSI.Models.PsiType]::NotSet;
 	if (-not ([string]::IsNullOrEmpty($Type))) {
 		try {
-			$pType = [PSI.Models.Mapper]::GetPsiType($Type);
+			$pType = [PSI.Models.PsiMapper]::GetPsiType($Type);
 		}
 		catch {
 			throw "Exception Parsing Enum value of [$Type] to PsiEnum of PsiType: $_ ";
@@ -178,21 +183,30 @@ function Add-PsiSmallDateTimeParameter {
 	
 }
 
+filter Expand-SerializedParameters {
+	param (
+		[Parameter(Mandatory)]
+		[string]$Parameters,
+		[string]$Name = $global:PsiDefaultParameterSetName
+	);
+	
+	return $global:PsiParameterManager.ParameterSetFromSerializedInput($Parameters, $Name);
+}
+
 <# 
 	Disclaimer about VERSIONING HELL. 
-	What I WANTED to do: 
-		Have 3x overloads in C# (i.e., in the Mapper.cs file) that looked like: 
+	What I WANTED: 
+		3x overloads in C# (i.e., in the PsiMapper.cs file) that looked like: 
 			- public static void LoadParameters(SqlCommand command, ParameterSet parameters){}
 			- public static void LoadParameters(OdbcCommand command, ParameterSet parameters){}
 			- public static void LoadParameters(OleDbCommand command, ParameterSet parameters){}
 
-		and then, from PsiCommand - just call: [PSI.Models.Mapper].LoadParameters($cmd, $Parameters). 
-		TYPE detection would have 'routed' to the proper command and ... i'd have some wire-up operations/glue to go through
-			in a fully type-safe environment... 
+		and then, from PsiCommand - just call: [PSI.Models.PsiMapper].LoadParameters($cmd, $Parameters). 
+		TYPE detection would have 'routed' to the proper command and ... i'd have some wire-up operations/glue as needed...
 
 	What HAPPENED: 
 		1. I had to add NUGET packages for System.Data.SqlClient|Odbc|OleDb to my .NET project. (no biggie)
-		2. I got this bit of happiness when trying to Add-Type against my dot-included .cs files: 
+		2. I got this ERROR when trying to Add-Type against my dot-included .cs files: 
 				The type name 'OdbcCommand' could not be found in the namespace 'System.Data.Odbc'. 
 					This type has been forwarded to assembly 'System.Data.Odbc, Version=0.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51' 
 					Consider adding a reference to that assembly.         
@@ -219,7 +233,6 @@ filter Bind-Parameters {
 	);
 	
 	# Jackpot: These are the core docs I need: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-	
 	switch ($Framework) {
 		"ODBC"	 {
 			foreach ($parameter in $Parameters.Parameters) {
@@ -281,7 +294,6 @@ filter Bind-OdbcParameter {
 			throw "Psi Framwork Error. PsiType has not been correctly set.";
 		}
 		{ $_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "Date", "Time", "SmallDateTime", "DateTime", "UniqueIdentifier", "Real") } {
-			# straight 'port'/crossover of type: 
 			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
 		}
 		{ $_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary") } {

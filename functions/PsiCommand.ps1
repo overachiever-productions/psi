@@ -1,101 +1,12 @@
 ﻿Set-StrictMode -Version 1.0;
 
-# REFACTOR:
-# 		I'll probably end up using 'Invoke-Xyz????' as my primary syntax - i.e., Invoke as the Verb. 
-# 			BUT... I COULD also either a) use Invoke AND the following or ... b) just the following:
-# 		Get/Set.
-# 			Get-XzyResult, Get-XyzResultAsXml, Get-XyzScalarResult... or Get-XyzResultAsScalar... etc 
-# 			Set-Xyz<NOUN> ??? as the only 'flavor'/version/implementation of a .NonQuery().
-# 					(maybe the <NOUN> is Sql(something?))
-# 				a bit different (and then some) from all OTHER Invoke-SQLcmd implementations - but a lot clearer and ... not TERRIBLE.
-# 			Along the lines of the above, Remove and Select are also core/approved verbs.
-# 				I think that Select would be ... terrible... but maybe NOT. 
-# 					and remove ... could be used identically to Set - ... just with the idea that end-users might want to use it for DELETEs and such.
-# 						but I would NOT make any distinction between it and Set (i.e., it'd be an alias at BEST)
-# 	
-
-
 <#
 	
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	
-# MVP tests: 
-
-	# assessment tests: 
-	$result = Invoke-PsiCommand -Query "SELECT 
-	servicename, 
-	startup_type_desc, 
-	status_desc, 
-	service_account, 
-	is_clustered, 
-	cluster_nodename
-FROM 
-	sys.dm_server_services WITH (NOLOCK) OPTION (RECOMPILE)
-	FOR JSON AUTO;";
-
-	# odd... this is _ALWAYS_ going to be JSON_F52E2B61-18A1-11d1-B105-00805F49916B ... and it's hard-coded... can't remove it. 
-	#		note who provided this reply: https://social.msdn.microsoft.com/Forums/sqlserver/en-US/0902b532-2e0e-41fc-a027-7beac3fafbfe/for-json-column-jsonf52e2b6118a111d1b10500805f49916b?forum=sqldatabaseengine 			
-	# 	that said... you can always put the query in a CTE and get just the primary/scalar result. 
-	# 			I've done that... and, need to account for it with -AsJson
-	# 			ditto on -AsXml... 
-	$result.'JSON_F52E2B61-18A1-11d1-B105-00805F49916B';
-
-
-
-	# plan-extraction example... MEGA bare-bones (i.e., needs a LOT of work to the actual query... but... if this works... damn): 
-	# success!!!!
-$query = "SELECT 
-	x.id,
-	eqp.query_plan
-FROM 
-	(SELECT id, plan_handle FROM (VALUES 
-		(1,   0x05001A008B2C9E2E509FAB19CF01000001000000000000000000000000000000000000000000000000000000), 
-		(2,   0x0500FF7F1CD8C8D500303129CF01000001000000000000000000000000000000000000000000000000000000), 
-		(3,   0x05001A00CE0C670540F4A329CF01000001000000000000000000000000000000000000000000000000000000), 
-		(4,   0x06001A00661F522D903C41DDCD01000001000000000000000000000000000000000000000000000000000000), 
-		(6,   0x06001A002675BD1AD09EB2C1CD01000001000000000000000000000000000000000000000000000000000000), 
-		(5,   0x06001A00261A7A2D609FB2C1CD01000001000000000000000000000000000000000000000000000000000000), 
-		(7,   0x05001A00A8E16233002F860CCF01000001000000000000000000000000000000000000000000000000000000), 
-		(8,   0x06001A00BD183006203D21C1CD01000001000000000000000000000000000000000000000000000000000000)
-	)
-		x(id, plan_handle)
-	) x
-	CROSS APPLY sys.dm_exec_query_plan(x.plan_handle) AS eqp
-ORDER BY 
-	x.id; "
-
-	$plans = Invoke-PsiCommand -Query $query;
-	foreach($row in $plans) {
-		$i = $row[0];
-		$plan = $row[1];
-		
-		Write-Host "Plan [$i]: $plan ";
-
-	}
-
-	#Premise Method (ish): (success!!!!!)
-	$scheduleCount = (Invoke-PsiCommand -Query "SELECT 
-			ISNULL(COUNT(*), 0) [count]
-		FROM 
-			msdb.dbo.sysjobs j 
-			INNER JOIN msdb.dbo.[sysjobschedules] js ON [j].[job_id] = [js].[job_id]
-			INNER JOIN msdb.dbo.[sysschedules] s ON [js].[schedule_id] = [s].[schedule_id]
-		WHERE 
-			j.[name] = N'Regular Restore Tests'; ").count;
-	
-		$scheduleCount;
-
-	
-
-
-
-
-# Basic Testing/Validation of CORE functionality... 
-	Invoke-PsiCommand -Query "DROP TABLE IF EXISTS yak_test; CREATE TABLE yak_test (id int);";
-	Invoke-PsiCommand -Query "SELECT [client_interface_name] FROM sys.dm_exec_sessions WHERE session_id = @@SPID; SELECT TOP 20 * FROM sys.databases;";
-	Invoke-PsiCommand -Framework "SQLClient" -Query "SELECT [client_interface_name] FROM sys.dm_exec_sessions WHERE session_id = @@SPID;";
-	Invoke-PsiCommand -Framework "OLEDB" -Query "SELECT [client_interface_name] FROM sys.dm_exec_sessions WHERE session_id = @@SPID;";
-
+	$jobName = "Fake Job";
+	$result = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -Credentials (Get-Credential sa) -Query "SELECT [enabled] FROM msdb.dbo.[sysjobs] WHERE [name] = @jobName; " -ParameterString "@jobName sysname = $jobName";
+	write-host $result.enabled;
 
 #>
 
@@ -105,7 +16,6 @@ function Invoke-PsiQuery {
 		[string]$Database = "master",
 		[string]$Query,
 		[PSCredential]$Credentials,
-
 		[string]$ConnectionString,
 		[int]$ConnectionTimeout = -1,
 		[int]$QueryTimeout = -1,
@@ -124,6 +34,7 @@ function Invoke-PsiQuery {
 
 function Invoke-PsiSproc {
 	param (
+		[Alias("ServerInstance", "ServerName", "Instance")]
 		[string]$SqlInstance = ".",
 		[string]$Database = "master",
 		[string]$SprocName,
@@ -155,20 +66,25 @@ function Invoke-PsiSprocAsScalar {
 	
 }
 
-# REFACTOR: might want to make this Invoke-XxxOperation instead of command?
 function Invoke-PsiCommand {
+	[CmdletBinding()]
 	param (
 		[string]$SqlInstance = ".",
 		[string]$Database = "master",
 		[string]$Query,
 		[string]$SprocName, # either $SprocName or $Query is populated - not BOTH. And ... obviously, if $SprocName then... $cmd.CommandType = ... sproc.
-		[PSCredential]$Credentials,
+		[ValidateSet("Text", "StoredProcedure")]
+		[string]$CommandType = "Text",
+		[PSCredential]$SqlCredential,
 		[PSI.Models.ParameterSet]$Parameters = $null,
+		[string]$ParameterString = $null,  #REFACTOR: posssibly call these variables? I don't like that... but it's what Invoke-SqlCmd does... at any rate ParamsString sucks... 
 		[string]$ConnectionString,  # optional... overwrites other stuff..
 		[int]$ConnectionTimeout = -1,
 		[int]$QueryTimeout = -1,
+		[string]$ApplicationName,
 		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
 		[string]$Framework = "AUTO",
+		[switch]$ReadOnly = $false,
 		[switch]$AsScalar = $false,
 		[switch]$AsNonQuery = $false,
 		[switch]$AsDataSet = $false,
@@ -177,7 +93,9 @@ function Invoke-PsiCommand {
 	);
 	
 	# Parameter Validation: 
-	# Only 1x of -AsXyz can be true at a time. So put them in an array and count # of them that are true... if it's > 1... throw... 
+	if (((@($AsScalar, $AsNonQuery, $AsDataSet, $AsJson, $AsXml) | Where-Object { $true -eq $_; } | Measure-Object).Count) -gt 1) {
+		throw "Invalid Parameter Usage for Invoke-PsiCommand. Only 1x -AsXXX switch can be set at a time.";
+	}
 	
 	$provider = $Framework;
 	if ($provider -eq "AUTO") {
@@ -186,7 +104,7 @@ function Invoke-PsiCommand {
 	
 	try {
 		$conn = Get-ConnectionObject -Framework $provider;
-		$conn.ConnectionString = Get-ConnectionString -Framework $provider -Server $SqlInstance -Database $Database -Credentials $Credentials -ConnectionString $ConnectionString;
+		$conn.ConnectionString = Get-ConnectionString -Framework $provider -Server $SqlInstance -Database $Database -SqlCredential $SqlCredential -ConnectionString $ConnectionString;
 		
 		if ($ConnectionTimeout -gt 0) {
 			$conn.ConnectionTimeout = $ConnectionTimeout;
@@ -200,6 +118,14 @@ function Invoke-PsiCommand {
 			$cmd.CommandTimeout = $ConnectionTimeout;
 		}
 		
+		if (-not ([string]::IsNullOrEmpty($ParameterString))) {
+			if ($Parameters) {
+				throw "Invalid Arguments. Only -Parameters OR -ParameterString can be used - not BOTH.";
+			}
+			
+			$Parameters = Expand-SerializedParameters -Parameters $ParameterString;
+		}
+		
 		if ($Parameters) {
 			Bind-Parameters -Framework $provider -Command $cmd -Parameters $Parameters;
 		}
@@ -210,7 +136,10 @@ function Invoke-PsiCommand {
 		$adapter.SelectCommand = $cmd;
 	}
 	catch {
-		throw "CONFIG error: $_ "; #TODO: embellis this MVP implementation ... i.e., this error handling sucks... 
+		# TODO: use https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables?view=powershell-7.3#erroractionpreference 
+		# 	 ErrorActionPreference to determine what to do ... 
+		# 		along with -ErrorAction (via CmdletBinding())
+		throw "CONFIG error: $_ "; #TODO: embellish this MVP implementation ... i.e., this error handling sucks... 
 	}
 	
 	try {
