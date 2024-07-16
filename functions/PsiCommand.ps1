@@ -3,188 +3,183 @@
 <#
 	
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-	
+
 	$jobName = "Fake Job";
-	$result = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -Credentials (Get-Credential sa) -Query "SELECT [enabled] FROM msdb.dbo.[sysjobs] WHERE [name] = @jobName; " -ParameterString "@jobName sysname = $jobName";
+	$result = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -SqlCredential (Get-Credential sa) -Query "SELECT [enabled] FROM msdb.dbo.[sysjobs] WHERE [name] = @jobName; " -ParameterString "@jobName sysname = $jobName";
 	write-host $result.enabled;
 
 #>
 
-function Invoke-PsiQuery {
-	param (
-		[string]$SqlInstance = ".",
-		[string]$Database = "master",
-		[string]$Query,
-		[PSCredential]$Credentials,
-		[string]$ConnectionString,
-		[int]$ConnectionTimeout = -1,
-		[int]$QueryTimeout = -1,
-		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
-		[string]$Framework = "AUTO",
-		[switch]$AsScalar = $false,
-		[switch]$AsDataSet = $false,
-		[switch]$AsJson = $false,
-		[switch]$AsXml = $false
-	);
-	
-	# rough sample/example - i.e., note the args above... $SprocName, $AsNonQuery are missing... 
-	# then... just call Invoke-LscCommand with the applicable operations passed in... 
-	
-}
-
-function Invoke-PsiSproc {
+function Invoke-PsiCommand {
+	[CmdletBinding()]
 	param (
 		[Alias("ServerInstance", "ServerName", "Instance")]
 		[string]$SqlInstance = ".",
 		[string]$Database = "master",
-		[string]$SprocName,
-		[PSCredential]$Credentials,
-		[string]$ConnectionString,
-		[int]$ConnectionTimeout = -1,
-		[int]$QueryTimeout = -1,
-		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
-		[string]$Framework = "AUTO",
-		[switch]$AsScalar = $false,
-		[switch]$AsDataSet = $false,
-		[switch]$AsJson = $false,
-		[switch]$AsXml = $false
-	);
-	
-	# similar to the above - but ... inverse. 
-}
-
-# TODO: need to figure out which of the 2x patterns below to use for 'overloads'. 
-# 	Invoke-XxxJsonYYYYY works great cuz... you know the output is JSON... 
-# 		but ... you'd have to know JSON vs XML vs SCALAR vs all the other modifiers OUT OF THe gate... 
-function Invoke-PsiJsonQuery {
-	
-}
-
-# whereas... Invoke-XyzSPROC|QUERY ... as the first part is good ... and, then from there, you can use intellisense to complete whether
-# 		you want ... just Sproc/Query or SprocForXml or SprocAsScalar or QueryAsDataSet etc... 
-function Invoke-PsiSprocAsScalar {
-	
-}
-
-function Invoke-PsiCommand {
-	[CmdletBinding()]
-	param (
-		[string]$SqlInstance = ".",
-		[string]$Database = "master",
-		[string]$Query,
-		[string]$SprocName, # either $SprocName or $Query is populated - not BOTH. And ... obviously, if $SprocName then... $cmd.CommandType = ... sproc.
+		[Alias("Command", "CommandText")]
+		[string]$Query = $null,
+		[Alias("Sproc", "ProcedureName", "Procedure")]
+		[string]$SprocName = $null, 
 		[ValidateSet("Text", "StoredProcedure")]
 		[string]$CommandType = "Text",
+		[Alias("Credential", "Credentials")]
 		[PSCredential]$SqlCredential,
 		[PSI.Models.ParameterSet]$Parameters = $null,
-		[string]$ParameterString = $null,  #REFACTOR: posssibly call these variables? I don't like that... but it's what Invoke-SqlCmd does... at any rate ParamsString sucks... 
-		[string]$ConnectionString,  # optional... overwrites other stuff..
+		[string]$ParameterString = $null,  
+		[string]$ConnectionString,  
 		[int]$ConnectionTimeout = -1,
+		[int]$CommandTimeout = -1,
 		[int]$QueryTimeout = -1,
+		[Alias("AppName")]
 		[string]$ApplicationName,
 		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
+		[Alias("Driver", "Provider")]
 		[string]$Framework = "AUTO",
 		[switch]$ReadOnly = $false,
+		[switch]$Encrypt = $true,
+		[switch]$TrustServerCert = $true,
+		[switch]$AsDataSet = $false,
+		[switch]$AsDataTable = $false,
+		[switch]$AsDataRow = $false,
 		[switch]$AsScalar = $false,
 		[switch]$AsNonQuery = $false,
-		[switch]$AsDataSet = $false,
 		[switch]$AsJson = $false,
 		[switch]$AsXml = $false
 	);
 	
-	# Parameter Validation: 
-	if (((@($AsScalar, $AsNonQuery, $AsDataSet, $AsJson, $AsXml) | Where-Object { $true -eq $_; } | Measure-Object).Count) -gt 1) {
-		throw "Invalid Parameter Usage for Invoke-PsiCommand. Only 1x -AsXXX switch can be set at a time.";
-	}
-	
-	$provider = $Framework;
-	if ($provider -eq "AUTO") {
-		$provider = Get-FrameworkProvider;
-	}
-	
-	try {
-		$conn = Get-ConnectionObject -Framework $provider;
-		$conn.ConnectionString = Get-ConnectionString -Framework $provider -Server $SqlInstance -Database $Database -SqlCredential $SqlCredential -ConnectionString $ConnectionString;
-		
-		if ($ConnectionTimeout -gt 0) {
-			$conn.ConnectionTimeout = $ConnectionTimeout;
+	begin{
+		if (((@($AsNonQuery, $AsScalar, $AsJson, $AsXml, $AsDataRow, $AsDataTable, $AsDataSet) | Where-Object { $true -eq $_; } | Measure-Object).Count) -gt 1) {
+			throw "Invalid Parameter Usage for Invoke-PsiCommand. Only 1x -AsXXX switch can be set at a time.";
 		}
 		
-		$cmd = Get-CommandObject -Framework $provider;
-		$cmd.Connection = $conn;
-		$cmd.CommandText = $Query;
-		
-		if ($ConnectionTimeout -gt 0) {
-			$cmd.CommandTimeout = $ConnectionTimeout;
+		if ((-not ([string]::IsNullOrEmpty($Query))) -and (-not ([string]::IsNullOrEmpty($SprocName)))) {
+			throw "query or sporc - not both.";
+		}
+		if ((([string]::IsNullOrEmpty($Query))) -and (([string]::IsNullOrEmpty($SprocName)))) {
+			throw "need one or the other";
+		}
+		if ((-not ([string]::IsNullOrEmpty($SprocName)))) {
+			$CommandType = "StoredProcedure";
 		}
 		
-		if (-not ([string]::IsNullOrEmpty($ParameterString))) {
-			if ($Parameters) {
-				throw "Invalid Arguments. Only -Parameters OR -ParameterString can be used - not BOTH.";
+		$provider = $Framework;
+		if ($provider -eq "AUTO") {
+			$provider = Get-FrameworkProvider;
+		}
+	}
+	
+	# TOOD: https://overachieverllc.atlassian.net/browse/PSI-24
+	process {
+		try {
+			$conn = Get-ConnectionObject -Framework $provider;
+			# TODO: https://overachieverllc.atlassian.net/browse/PSI-23 
+			$conn.ConnectionString = Get-ConnectionString -Framework $provider -Server $SqlInstance -Database $Database -SqlCredential $SqlCredential -ConnectionString $ConnectionString;
+			
+			if ($ConnectionTimeout -gt 0) {
+				$conn.ConnectionTimeout = $ConnectionTimeout;
 			}
 			
-			$Parameters = Expand-SerializedParameters -Parameters $ParameterString;
+			$cmd = Get-CommandObject -Framework $provider;
+			$cmd.Connection = $conn;
+			$cmd.CommandText = $Query;
+			$cmd.CommandType = $CommandType;
+			
+			if ($CommandTimeout -gt 0) {
+				$cmd.CommandTimeout = $CommandTimeout;
+			}
+			
+			if (-not ([string]::IsNullOrEmpty($ParameterString))) {
+				if ($Parameters) {
+					throw "Invalid Arguments. Only -Parameters OR -ParameterString can be used - not BOTH.";
+				}
+				
+				$Parameters = Expand-SerializedParameters -Parameters $ParameterString;
+			}
+			
+			if ($Parameters) {
+				Bind-Parameters -Framework $provider -Command $cmd -Parameters $Parameters;
+			}
+			
+			# MKC: Hmm. What IF I created a PsiDataSet - which 'derived from' System.Data.DataSet and which had a few extra 'goodies' or details
+			# 		such as: .SourceCommand, .ServerName(beingExecutedAgainst), .PrintedOutput, .ParameterOutputs ... 
+			# 			at that point, I'd then have ... everything I need for a given 'result'/operation against the server
+			# 				and would JUST need to figure out a way of 'chunking' the $Query being passed in (i.e., split against GO (#) ... and then
+			# 				wire up some sort of collection/container of these objects? )
+			$dataSet = New-Object System.Data.DataSet;
+			$adapter = Get-DataAdapter $provider;
+			
+			$adapter.SelectCommand = $cmd;
+		}
+		catch {
+			# TODO: https://overachieverllc.atlassian.net/browse/PSI-15
+			throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)";
+			
+			# TODO: ... there's no 'finally' here that cleans up objects ... 
 		}
 		
-		if ($Parameters) {
-			Bind-Parameters -Framework $provider -Command $cmd -Parameters $Parameters;
+		try {
+			$conn.Open();
+			# TODO: https://overachieverllc.atlassian.net/browse/PSI-20 
+			$adapter.Fill($dataSet) | Out-Null;
+			$conn.Close();
+		}
+		catch {
+			# TODO: https://overachieverllc.atlassian.net/browse/PSI-15
+			throw "EXECUTION ERROR: $_ ";
+		}
+		finally {
+			$conn.Close();
 		}
 		
-		$dataSet = New-Object System.Data.DataSet;
-		$adapter = Get-DataAdapter $provider;
+		# Processing of outputs is a BIT complex. But the best way to tackle that is to:
+		# 	1. Check for any EXPLICIT -AsXXX output types first (going 'up' from smallest/least output type to largest output type)
+		# 	2. Once those EXPLICIT options are handled, try going 'down' from largest to smallest to return whatever makes the most SENSE. 
+		if ($AsNonQuery) {
+			return;
+		}
 		
-		$adapter.SelectCommand = $cmd;
-	}
-	catch {
-		# TODO: use https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables?view=powershell-7.3#erroractionpreference 
-		# 	 ErrorActionPreference to determine what to do ... 
-		# 		along with -ErrorAction (via CmdletBinding())
-		throw "CONFIG error: $_ "; #TODO: embellish this MVP implementation ... i.e., this error handling sucks... 
-	}
-	
-	try {
-		$conn.Open();
-		$adapter.Fill($dataSet) | Out-Null; # TODO: I'm doing Out-Null to capture 'nocount off' (rowcount) kind of stuff. what about printed outputs? can i capture those? SHOULD I capture those? And, if I do... how do I return them to the user? 
-		$conn.Close();
-	}
-	catch {
-		# TODO: look at options for handling SQL errors ... i.e., silentlycontinue? output? or stop/throw?
-		throw "OPERATION error: $_ "; #TODO: embellish this MVP implementation ... i.e., this error handling sucks... 
-	}
-	finally {
-		$conn.Close();
-	}
-	
-	if ($dataSet.Tables.Count -gt 1) {
-		return $dataSet; # multiple tables (result-sets) - output the entire data set.
-	}
-	
-	$table = $dataSet.Tables[0];
-	if ($table.Rows.Count -gt 1) {
-		return $table; # multiple rows - output the entire table.
-	}
-	
-	# Non-Queries will NOT have any results (obviously). 
-	if ($table.Rows.Count -eq 0) {
-		# TODO: Obviously, by this point we've checkd for ERRORs and ... handled them. 
-		# 	but...what about messages? e.g., "x rows modified?" or "successful?"
-		# 		as in: how does Invoke-SqlCmd handle things like this (pretty sure that I look for "success" when deploying admindb right?)
-		# 		AND... do I want to look into handling anything similar or ... differently? 
-		return;
-	}
-	
-	$row = $table.Rows[0];
-	if ($row.Columns.Count -gt 1) {
-		return $row; # multiple columns - return the entire row.
+		if ($AsScalar -or $AsJson -or $AsXml) {
+			# convert if/as needed... otherwise ... output.
+			return $dataSet.Tables[0].Rows[0][0];
+			throw "Explicit -AsScalar, -AsJson, and -AsXml switches are not YET implemented.";
+		}
+		
+		if ($AsDataRow) {
+			return $dataSet.Tables[0].Rows[0];
+		}
+		
+		if ($AsDataTable) {
+			return $dataSet.Tables[0];
+		}
+		
+		# Done with 1 (going 'up' vs explicit output types) and ... starting to go 'down' implicit types (in single clause):
+		if (($AsDataSet) -or ($dataSet.Tables.Count -gt 1)) {
+			return $dataSet;
+		}
+		
+		$table = $dataSet.Tables[0];
+		if ($table.Rows.Count -gt 1) {
+			return $table;
+		}
+		
+		if ($table.Rows.Count -eq 0) {
+			return; # this is/was an 'implicit' -AsNonQuery
+		}
+		
+		$row = $table.Rows[0];
+		if ($row.Columns.Count -gt 1) {
+			return $row; # multiple columns - return the entire row.
+		}
+		
+		# There are 3x options for returning scalar values:
+		# 		a. Return the WHOLE ROW (even if it's just a single column-wide). This is what Invoke-SqlCmd does. 
+		# 		b. Create a custom PSObject with column-name and value results. CAN'T see ANY benefit to this over a data-row.
+		# 		c. No context info - just the scalar result itself (i.e., not the column-name - just the 'scalar value itself - fully isolated')/
+		# For now, Invoke-PsiCommand will leverage option A. 
+		return $row; # option C would be $row[0].	
 	}
 	
-	# TODO: determine how I want to handle scalar outputs. 
-	# 		there are 3 options: 
-	# 			a. just return the whole row - i.e., "don't bother" with this distinction. 
-	# 			b. return a name-value pair ... i.e., the column-name + value - for this 'single' result. 
-	# 			c. full on 'scalar' kind of output ... as in, JUST the value (no column-name or anything else.)
-	# 		i think the only, real, options here are a & c. 
-	
-	# for now - option A. Which most closely resembles how Invoke-SqlCmd does this...  
-	return $row; #.Columns[0]; 
+	end {
+
+	}
 }

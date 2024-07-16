@@ -18,6 +18,7 @@ namespace PSI.Models
 
         // TODO: maybe make VALUE, size, precision, and scope all NULLable instead of the -1 (and meh it might be null) approach I'm using now... 
         //      -1 is too ... magic-number-y.
+        //      and/or just create different 'overloads' of the .ctor
         public Parameter(string name, PsiType type, PDirection direction, object value, int size = -1, int precision = -1, int scale = -1)
         {
             if (type == PsiType.NotSet)

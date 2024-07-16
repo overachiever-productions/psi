@@ -1,5 +1,8 @@
 ﻿namespace PSI.Models
 {
+
+    // REFACTOR: PsiDataType
+
     // Fodder: https://learn.microsoft.com/en-us/dotnet/api/system.data.sqldbtype?view=net-7.0
     public enum PsiType
     {

@@ -237,7 +237,6 @@ filter Bind-Parameters {
 		"ODBC"	 {
 			foreach ($parameter in $Parameters.Parameters) {
 				Bind-OdbcParameter -Command $Command -Parameter $parameter;
-				
 				# ODBC doesn't allow @namedParams (in the Command itself) for TEXT operations:
 				# 	fodder: 
 				# 		https://stackoverflow.com/questions/1535994/asp-net-odbc-query-with-parameters
