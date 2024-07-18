@@ -10,6 +10,7 @@
 
 #>
 
+# Aliases for function itself could include: Invoke-Sql, Invoke-SqlOperation, Invoke-PsiSql, Invoke-Psi... 
 function Invoke-PsiCommand {
 	[CmdletBinding()]
 	param (
