@@ -1,6 +1,8 @@
 ﻿Set-StrictMode -Version 1.0;
 
 filter Get-FrameworkProvider {
+	# TODO: might also make sense to look to see which drivers are installed on box. 
+	
 	$poshVersion = $PSVersionTable.PSVersion;
 	if ($poshVersion.Major -ge 5) {
 		return "ODBC";
