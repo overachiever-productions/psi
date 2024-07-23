@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 1.0;
+﻿Set-StrictMode -Version 3.0;
 
 <#
 
@@ -18,7 +18,7 @@
 			j.[name] = @JobName; ";
 
 	$query = "SELECT [name] FROM sys.databases WHERE [database_id] = @id";
-	Add-PsiParameter -Direction Return;
+	#Add-PsiParameter -Direction Return;
 	Add-PsiParameter -Name "id" -Type "Int" -Value 11;
 
 $parameters;
@@ -49,7 +49,7 @@ filter New-PsiParameterSet {
 		}
 		else {
 			throw "A PsiParameterSet with the name of [$Name] alrerady exists. Please specify a distinct -Name value for each ParameterSet.";
-		}		
+		}
 	}
 	
 	$global:PsiParameterManager.AddParameterSet($Name);
@@ -73,11 +73,11 @@ function Add-PsiParameter {
 	param (
 		[string]$Name = $null,
 		[ValidateSet("char", "varchar", "varcharMAX", "Nchar", "Nvarchar", "NvarcharMAX", "binary", "varbinary", "varbinaryMAX",
-			"bit", "tinyint", "smallint", "int", "bigint", "decimal", "numeric", "smallmoney", "money", "float", "real", "date", "time",
-			"smalldatetime", "datetime", "datetime2", "datetimeoffset", "uniqueidentifier", "image", "text", "Ntext", "sqlvariant",
-			"geometry", "geography", "timestamp", "xml", "sysname"
-		)]
-		[string]$Type = $null,		
+					 "bit", "tinyint", "smallint", "int", "bigint", "decimal", "numeric", "smallmoney", "money", "float", "real", "date", "time",
+					 "smalldatetime", "datetime", "datetime2", "datetimeoffset", "uniqueidentifier", "image", "text", "Ntext", "sqlvariant",
+					 "geometry", "geography", "timestamp", "xml", "sysname"
+					 )]
+		[string]$Type = $null,
 		[object]$Value = $null,
 		[int]$Size = $null,
 		[ValidateSet("Input", "InputOutput", "Output", "Return")]
@@ -125,7 +125,7 @@ function Add-PsiParameter {
 			throw "-Precision and -Scale may ONLY be set for decimal and numeric types.";
 		}
 		
-		if(-not($Precision -and $Scale)) {
+		if (-not ($Precision -and $Scale)) {
 			throw "Both -Precision and -Scale are required for decimal and numeric types.";
 		}
 	}
@@ -292,24 +292,34 @@ filter Bind-OdbcParameter {
 		"NotSet" {
 			throw "Psi Framwork Error. PsiType has not been correctly set.";
 		}
-		{ $_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "Date", "Time", "SmallDateTime", "DateTime", "UniqueIdentifier", "Real") } {
+		{
+			$_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "Date", "Time", "SmallDateTime", "DateTime", "UniqueIdentifier", "Real")
+		} {
 			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
 		}
-		{ $_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary") } {
+		{
+			$_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary")
+		} {
 			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
 			$size = $Parameter.Size;
 		}
-		{ $_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax") } {
+		{
+			$_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")
+		} {
 			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
 			$size = -1;
 		}
-		{ $_ -in @("Decimal", "Numeric") } {
+		{
+			$_ -in @("Decimal", "Numeric")
+		} {
 			# ODBC implements as Numeric (for both): https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-			$typ = [System.Data.Odbc.OdbcType]::Numeric; 
+			$typ = [System.Data.Odbc.OdbcType]::Numeric;
 			$precision = $Parameter.Precision;
 			$scale = $Parameter.Scale;
 		}
-		{ $_ -in @("Image", "Text", "NText") } {
+		{
+			$_ -in @("Image", "Text", "NText")
+		} {
 			# TODO: optional WARN on deprecated SQL Server types... 
 			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
 		}
@@ -351,7 +361,7 @@ filter Bind-OdbcParameter {
 		}
 		"TimeStamp" {
 			# yeah... ODBC.TimeStamp = SQL_BINARY stream... don't think i want to use this.. 
-			$type = [System.Data.Odbc.OdbcType]::Timestamp; 
+			$type = [System.Data.Odbc.OdbcType]::Timestamp;
 		}
 		"Xml" {
 			#$p = New-OdbcParameter -Name $Parameter.Name -Type  -Direction $direction;
@@ -411,7 +421,9 @@ filter Bind-OleDbParameter {
 		"NotSet" {
 			throw "Psi Framwork Error. PsiType has not been correctly set.";
 		}
-		{ $_ -in @("SmallInt", "BigInt", "Decimal", "Numeric")} {
+		{
+			$_ -in @("SmallInt", "BigInt", "Decimal", "Numeric")
+		} {
 			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
 		}
 		"Bit" {
@@ -423,7 +435,9 @@ filter Bind-OleDbParameter {
 		"Int" {
 			$type = [System.Data.OleDb.OleDbType]::Integer;
 		}
-		{ $_ -in @("Char", "Varchar", "Binary", "Varbinary")} {
+		{
+			$_ -in @("Char", "Varchar", "Binary", "Varbinary")
+		} {
 			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
 			$size = $Parameter.Size;
 		}
@@ -557,19 +571,27 @@ filter Bind-SqlClientParameter {
 		"NotSet" {
 			throw "Psi Framwork Error.";
 		}
-		{ $_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float", 
-				"Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier") } {
+		{
+			$_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float",
+				"Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier")
+		} {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
 		}
-		{ $_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2") } {
+		{
+			$_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2")
+		} {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
 			$size = $Parameter.Size;
-		}		
-		{ $_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax") } {
+		}
+		{
+			$_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")
+		} {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
 			$size = -1;
 		}
-		{ $_ -in @("Decimal", "Numeric") } {
+		{
+			$_ -in @("Decimal", "Numeric")
+		} {
 			$type = [System.Data.SqlDbType]::Decimal;
 			$precision = $Parameter.Precision;
 			$scale = $Parameter.Scale;

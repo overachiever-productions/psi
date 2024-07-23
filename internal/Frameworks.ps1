@@ -1,4 +1,4 @@
-﻿Set-StrictMode -Version 1.0;
+﻿Set-StrictMode -Version 3.0;
 
 filter Get-FrameworkProvider {
 	# TODO: might also make sense to look to see which drivers are installed on box. 

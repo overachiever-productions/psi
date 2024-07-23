@@ -1,75 +1,43 @@
-﻿Set-StrictMode -Version 1.0;
+﻿Set-StrictMode -Version 3.0;
 
 <#
 	
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 
-	$jobName = "Fake Job";
-	$result = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -SqlCredential (Get-Credential sa) -Query "SELECT [enabled] FROM msdb.dbo.[sysjobs] WHERE [name] = @jobName; " -ParameterString "@jobName sysname = $jobName";
-	write-host $result.enabled;
-
 #>
 
-# Aliases for function itself could include: Invoke-Sql, Invoke-SqlOperation, Invoke-PsiSql, Invoke-Psi... 
-function Invoke-PsiCommand {
+
+function Invoke-DatabaseCommand {
 	[CmdletBinding()]
 	param (
-		[Alias("ServerInstance", "ServerName", "Instance")]
-		[string]$SqlInstance = ".",
-		[string]$Database = "master",
-		[Alias("Command", "CommandText")]
-		[string]$Query = $null,
-		[Alias("Sproc", "ProcedureName", "Procedure")]
-		[string]$SprocName = $null, 
-		[ValidateSet("Text", "StoredProcedure")]
-		[string]$CommandType = "Text",
-		[Alias("Credential", "Credentials")]
-		[PSCredential]$SqlCredential,
+		[string]$Command = $null,
+		[string]$SprocName = $null,  # one or the other - i.e., either a command or ... a sproc-name.
+		[string]$CommandType,			# same-ish as the above - i.e., dictates what we're using and ... should match
 		[PSI.Models.ParameterSet]$Parameters = $null,
-		[string]$ParameterString = $null,  
-		[string]$ConnectionString,  
+		[string]$ConnectionString,
 		[int]$ConnectionTimeout = -1,
 		[int]$CommandTimeout = -1,
 		[int]$QueryTimeout = -1,
-		[Alias("AppName")]
 		[string]$ApplicationName,
-		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
-		[Alias("Driver", "Provider")]
-		[string]$Framework = "AUTO",
+		[string]$Framework,
+		
+		# not sure how to handle these... 
 		[switch]$ReadOnly = $false,
 		[switch]$Encrypt = $true,
-		[switch]$TrustServerCert = $true,
-		[switch]$AsDataSet = $false,
-		[switch]$AsDataTable = $false,
-		[switch]$AsDataRow = $false,
-		[switch]$AsScalar = $false,
-		[switch]$AsNonQuery = $false,
-		[switch]$AsJson = $false,
-		[switch]$AsXml = $false
+		[switch]$TrustServerCert = $true
+#		[switch]$AsDataSet = $false,
+#		[switch]$AsDataTable = $false,
+#		[switch]$AsDataRow = $false,
+#		[switch]$AsScalar = $false,
+#		[switch]$AsNonQuery = $false,
+#		[switch]$AsJson = $false,
+#		[switch]$AsXml = $false
 	);
 	
-	begin{
-		if (((@($AsNonQuery, $AsScalar, $AsJson, $AsXml, $AsDataRow, $AsDataTable, $AsDataSet) | Where-Object { $true -eq $_; } | Measure-Object).Count) -gt 1) {
-			throw "Invalid Parameter Usage for Invoke-PsiCommand. Only 1x -AsXXX switch can be set at a time.";
-		}
-		
-		if ((-not ([string]::IsNullOrEmpty($Query))) -and (-not ([string]::IsNullOrEmpty($SprocName)))) {
-			throw "query or sporc - not both.";
-		}
-		if ((([string]::IsNullOrEmpty($Query))) -and (([string]::IsNullOrEmpty($SprocName)))) {
-			throw "need one or the other";
-		}
-		if ((-not ([string]::IsNullOrEmpty($SprocName)))) {
-			$CommandType = "StoredProcedure";
-		}
-		
-		$provider = $Framework;
-		if ($provider -eq "AUTO") {
-			$provider = Get-FrameworkProvider;
-		}
+	begin {
+		# validations / etc. 
 	}
 	
-	# TOOD: https://overachieverllc.atlassian.net/browse/PSI-24
 	process {
 		try {
 			$conn = Get-ConnectionObject -Framework $provider;
@@ -178,9 +146,11 @@ function Invoke-PsiCommand {
 		# 		c. No context info - just the scalar result itself (i.e., not the column-name - just the 'scalar value itself - fully isolated')/
 		# For now, Invoke-PsiCommand will leverage option A. 
 		return $row; # option C would be $row[0].	
+		
+		
 	}
 	
 	end {
-
+		
 	}
 }

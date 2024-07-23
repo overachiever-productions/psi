@@ -79,14 +79,14 @@ namespace PSI.Models
 
                 string declaration = parts[0];
                 // TODO: this regex needs some help... 
-                Regex r = new Regex(@"(?<name>.+\s)(?<type>.+)");
+                Regex r = new Regex(@"(?<name>.+\s)(?<dataType>.+)");
                 Match m = r.Match(declaration);
 
                 if (m.Success)
                 {
                     p.Name = m.Groups["name"].Value.Trim();
 
-                    string type = m.Groups["type"].Value.Trim();
+                    string type = m.Groups["dataType"].Value.Trim();
                     string sizing = null;
                     if (type.Contains("("))
                     {
@@ -94,12 +94,12 @@ namespace PSI.Models
                         type = type.Replace(sizing, "");
                     }
 
-                    PsiType psiType = PsiMapper.GetPsiType(type);
-                    p.Type = psiType;
+                    DataType dataType = PsiMapper.GetPsiType(type);
+                    p.DataType = dataType;
 
                     if (sizing != null)
                     {
-                        // TODO: verify that the psiType is sizeable/etc... 
+                        // TODO: verify that the dataType is sizeable/etc... 
 
                         sizing = sizing.Replace("(", "").Replace(")", "");
                         if (type == "decimal" || type == "numeric")
@@ -118,91 +118,91 @@ namespace PSI.Models
                 if (value != null)
                 {
                     // this is FUGLY: 
-                    switch (p.Type)
+                    switch (p.DataType)
                     {
-                        case PsiType.NotSet:
+                        case DataType.NotSet:
                             throw new InvalidOperationException("Psi Framework Error.");
-                        case PsiType.Char: 
-                        case PsiType.Varchar:
-                        case PsiType.VarcharMax:
-                        case PsiType.NChar:
-                        case PsiType.NVarchar:
-                        case PsiType.NVarcharMax:
-                        case PsiType.Sysname:
-                        case PsiType.Xml:  // i THINK this'll work just fine... 
+                        case DataType.Char: 
+                        case DataType.Varchar:
+                        case DataType.VarcharMax:
+                        case DataType.NChar:
+                        case DataType.NVarchar:
+                        case DataType.NVarcharMax:
+                        case DataType.Sysname:
+                        case DataType.Xml:  // i THINK this'll work just fine... 
                             p.Value = value;
                             break;
-                        case PsiType.Binary:
-                        case PsiType.Varbinary:
-                        case PsiType.VarbinaryMax:
+                        case DataType.Binary:
+                        case DataType.Varbinary:
+                        case DataType.VarbinaryMax:
                             throw new NotFiniteNumberException("not done yet");
                             // what I want here is ... p.Value = value.ToByteArray() or whatever would make sense here: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
                             // looks like this is it: https://stackoverflow.com/a/38140138/11191
                             //break;
-                        case PsiType.Bit:
+                        case DataType.Bit:
                             // TODO: test this... 
                             p.Value = Boolean.Parse(value);
                             break;
-                        case PsiType.TinyInt:
+                        case DataType.TinyInt:
                             p.Value = Convert.ToByte(value);
                             break;
-                        case PsiType.SmallInt:
+                        case DataType.SmallInt:
                             p.Value = Convert.ToInt16(value);
                             break;
-                        case PsiType.Int:
+                        case DataType.Int:
                             p.Value = Convert.ToInt32(value);
                             break;
-                        case PsiType.BigInt:
+                        case DataType.BigInt:
                             p.Value = Convert.ToInt64(value);
                             break;
-                        case PsiType.Numeric:
-                        case PsiType.Decimal:
+                        case DataType.Numeric:
+                        case DataType.Decimal:
                             p.Value = Convert.ToDecimal(value);
                             break;
-                        case PsiType.SmallMoney:
-                        case PsiType.Money:
+                        case DataType.SmallMoney:
+                        case DataType.Money:
                             p.Value = Convert.ToSingle(value); // TODO: need to test/review this ... 
                             break;
-                        case PsiType.Float:
+                        case DataType.Float:
                             p.Value = Convert.ToDouble(value);
                             break;
-                        case PsiType.Real:
+                        case DataType.Real:
                             p.Value = Convert.ToSingle(value);
                             break;
-                        case PsiType.Date:
+                        case DataType.Date:
                             //p.Value = DateOnly.Parse(value);
                             p.Value = DateTime.Parse(value); // TODO: need to evaluate this... 
                             break;
-                        case PsiType.Time:
+                        case DataType.Time:
                             //p.Value = TimeOnly.Parse(value);
                             p.Value = TimeSpan.Parse(value);
                             break;
-                        case PsiType.SmallDateTime:
-                        case PsiType.DateTime:
-                        case PsiType.DateTime2:
+                        case DataType.SmallDateTime:
+                        case DataType.DateTime:
+                        case DataType.DateTime2:
                             p.Value = DateTime.Parse(value);
                             break;
-                        case PsiType.UniqueIdentifier:
+                        case DataType.UniqueIdentifier:
                             p.Value = Guid.Parse(value);
                             break;
-                        case PsiType.DateTimeOffset:
-                        case PsiType.Image:
-                        case PsiType.Text:
-                        case PsiType.NText:
-                        case PsiType.SqlVariant:
-                        case PsiType.Geometry:
-                        case PsiType.Geography:
-                        case PsiType.TimeStamp:
-                            throw new InvalidOperationException($"Type [{p.Type}] is NOT supported for inline/serialized Psi Parameters.");
+                        case DataType.DateTimeOffset:
+                        case DataType.Image:
+                        case DataType.Text:
+                        case DataType.NText:
+                        case DataType.SqlVariant:
+                        case DataType.Geometry:
+                        case DataType.Geography:
+                        case DataType.TimeStamp:
+                            throw new InvalidOperationException($"DataType [{p.DataType}] is NOT supported for inline/serialized Psi Parameters.");
                         default:
-                            throw new NotImplementedException("Psi Framework Error. Invalid PsiType detected.");
+                            throw new NotImplementedException("Psi Framework Error. Invalid DataType detected.");
                     }
                 }
 
-                p.Direction = PDirection.Input;
+                p.Direction = ParameterDirection.Input;
                 if (isOutput)
                 {
-                    p.Direction = p.Value != null ? PDirection.InputOutput : PDirection.Output;
+                    p.Direction = p.Value != null ? ParameterDirection.InputOutput : ParameterDirection.Output;
                 }
 
                 output.Parameters.Add(p);
