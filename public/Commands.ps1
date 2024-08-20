@@ -3,30 +3,65 @@
 <#
 	
 
-#$query = Get-Content "D:\Dropbox\Desktop\.junk\psi_script_test.sql" -Raw;
+					#$query = Get-Content "D:\Dropbox\Desktop\.junk\psi_script_test.sql" -Raw;
+
+
+					#$query = @"
+					#USE [admindb];   /* multi line comment here - to make sure that multi-line comments
+					#can
+					#and will
+					#be ignored */
+					#GO
+					#
+					#IF OBJECT_ID(N'abc', N'U') IS NULL BEGIN 
+					#    CREATE TABLE abc (id int);
+					#END; 
+					#GO
+					#
+					#USE [admindb];  -- comment here - just for fun. 
+					#GO 
+					#
+					#IF OBJECT_ID(N'xyz', N'U') IS NULL BEGIN 
+					#    CREATE TABLE xyz (id int);
+					#END;
+					#GO
+					#"@;
+
+
+					#$query = Get-Content "D:\Dropbox\Repositories\S4\Common\Tables\restore_log.sql" -Raw;
 
 
 $query = @"
-USE [admindb];   /* multi line comment here - to make sure that multi-line comments
-can
-and will
-be ignored */
-GO
+/*
+	SAMPLE header comments with a 
+	GO 
+	on a new line... 
 
-IF OBJECT_ID(N'abc', N'U') IS NULL BEGIN 
-    CREATE TABLE abc (id int);
-END; 
-GO
+*/
 
-USE [admindb];  -- comment here - just for fun. 
-GO 
+IF EXISTS(SELECT NULL FROM sys.objects WHERE [name] = N'Something Else') BEGIN
+    SELECT N'Here is a 
+GO  -- but do NOT break here - cuz in a string
+But it is in comments';  -- and there's a GO in the 'string' as well. 
+END;
+GO  -- ignored comments
 
-IF OBJECT_ID(N'xyz', N'U') IS NULL BEGIN 
-    CREATE TABLE xyz (id int);
+
+IF OBJECT_ID('dbo.settings','U') IS NULL BEGIN
+	PRINT 'doing stuff here.';	
+  END;
+ELSE BEGIN 
+	IF NOT EXISTS (SELECT NULL FROM sys.columns WHERE [object_id] = OBJECT_ID('dbo.settings') AND [name] = N'setting_id') BEGIN 
+		BEGIN TRAN
+			PRINT 'more stuff';
+		COMMIT;
+
+        IF OBJECT_ID(N'tempdb..#settings') IS NOT NULL 
+            DROP TABLE [#settings];
+	END;
 END;
 GO
 "@;
-
 
 
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
@@ -75,7 +110,7 @@ function Invoke-PsiCommand {
 		[Alias("Sproc", "ProcedureName", "Procedure")]
 		[string[]]$SprocName = $null,
 		
-# Users don't need to specify this IF I've got params for both -Query (FIle) and -SprocName
+# Users don't need to specify this IF I've got params for both -Query (File) and -SprocName
 #		[ValidateSet("Text", "StoredProcedure")]
 #		[string]$CommandType = "Text",
 		
@@ -209,7 +244,7 @@ function Invoke-PsiCommand {
 				foreach ($db in $Database) {
 					foreach ($command in $commands) {
 						foreach ($serializedParameters in $ParameterString) {
-							foreach ($batch in $command.GetBatchedCommands()) {
+							foreach ($batch in $command.GetBatches()) {
 								
 								# TODO: I THINK that the $batch (which is a BatchContext)
 								# 	is PROBABLY the object that I'll send further into the pipeline.
@@ -227,7 +262,10 @@ function Invoke-PsiCommand {
 #								Write-Host "-- SERVER: [$($connection.Server)] --- DB: [$db] -------";
 								
 								Write-Host "========================================================================================";
-								Write-Host $batch.BatchCommand.BatchText;
+								Write-Host "-->|$($batch.BatchText)|<--";
+								Write-Host "";
+								Write-Host "-------------------------------------------------";
+								#Write-Host $batch.BatchCommand.SourceBatch;
 								
 								$batchNumber += 1;
 							}

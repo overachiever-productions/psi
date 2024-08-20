@@ -6,14 +6,14 @@
 // https://learn.microsoft.com/en-us/dotnet/api/system.data.oledb.oledbconnectionstringbuilder?view=net-8.0 
 // and, one thing that's SUPER clear: OLEDB and ODBC don't have NEAR the number of connection options that SqlClient does. 
 // specifically, they don't have EXPLICIT properties for: 
-// ApplicationIntent (Ah, though they do have IsReadOnly)
-// Connection retry logic (# of retries and times)
-// TIMEOUT. wtf? 
-// AlwaysEncrypted 'stuff' ... 
-// Encrypt (i.e., .... TLS? + TrustServerCert)
-// Connection Pooling directives (loadbalancetimeout, maxpoolsize, minpoolsize)
-// MultiSubnetFailover. 
-// PacketSize
+//      ApplicationIntent (Ah, though they do have IsReadOnly)
+//      Connection retry logic (# of retries and times)
+//      TIMEOUT. wtf? 
+//      AlwaysEncrypted 'stuff' ... 
+//      Encrypt (i.e., .... TLS? + TrustServerCert)
+//      Connection Pooling directives (loadbalancetimeout, maxpoolsize, minpoolsize)
+//      MultiSubnetFailover. 
+//      PacketSize
 //                   
 // BUT, the different drivers (OLEDB and ODBC) DO provide connection-string details for 'all the options'
 // e.g., see this: 

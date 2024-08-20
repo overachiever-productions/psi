@@ -4,16 +4,13 @@
 [string]$ScriptRoot = $PSScriptRoot;
 	
 $classFiles = @(
-	"$ScriptRoot\clr\PSI.Models\Usings.cs"
-	"$ScriptRoot\clr\PSI.Models\Extensions.cs"
 	"$ScriptRoot\clr\PSI.Models\Global.cs"
 	"$ScriptRoot\clr\PSI.Models\Enums.cs"
 	"$ScriptRoot\clr\PSI.Models\Connection.cs"
 	"$ScriptRoot\clr\PSI.Models\Command.cs"
 	"$ScriptRoot\clr\PSI.Models\Parameter.cs"
-	"$ScriptRoot\clr\PSI.Models\ParameterSet.cs"
-	"$ScriptRoot\clr\PSI.Models\ParameterSetManager.cs"
-	"$ScriptRoot\clr\PSI.Models\PsiMapper.cs"
+	"$ScriptRoot\clr\PSI.Models\Tokenizer.cs"
+	"$ScriptRoot\clr\PSI.Models\TokenHandlers.cs"
 );
 	
 Add-Type -Path $classFiles;
