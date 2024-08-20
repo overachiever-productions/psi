@@ -23,8 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="functional tests\" />
-    <Folder Include="unit tests\" />
+    <Folder Include="integration tests\" />
   </ItemGroup>
 
   <ItemGroup>
