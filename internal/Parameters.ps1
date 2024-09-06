@@ -4,8 +4,8 @@
 
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	
-	$parameters = New-PsiParameterSet;
-	#Add-PsiParameter -Direction Return;
+	$parameters = New-PsiParameterSet;  # REFACTOR: $parameters = New-Parameters or New-PsiParameters ... 
+	#Add-PsiParameter -Direction Return;   # REFACTOR: Add-Parameter or Add-PsiParameter
 	#Add-PsiParameter -Name "@JobName" -Type "Sysname" -Value "Fake Job";
 
 	$query = "SELECT 
@@ -87,7 +87,7 @@ function Add-PsiParameter {
 		[string]$SetName = $global:PsiDefaultParameterSetName
 	);
 	
-	$pDirection = [PSI.Models.PDirection]::NotSet;
+	$pDirection = [PSI.Models.ParameterDirection]::NotSet;
 	if (-not ([string]::IsNullOrEmpty($Direction))) {
 		try {
 			$pDirection = [PSI.Models.PsiMapper]::GetPDirection($Direction);
@@ -97,7 +97,7 @@ function Add-PsiParameter {
 		}
 	}
 	
-	$pType = [PSI.Models.PsiType]::NotSet;
+	$pType = [PSI.Models.DataType]::NotSet;
 	if (-not ([string]::IsNullOrEmpty($Type))) {
 		try {
 			$pType = [PSI.Models.PsiMapper]::GetPsiType($Type);
@@ -108,14 +108,14 @@ function Add-PsiParameter {
 	}
 	
 	if ($Direction) {
-		if ($pDirection -eq [PSI.Models.PDirection]::Return) {
+		if ($pDirection -eq [PSI.Models.ParameterDirection]::Return) {
 			if ([string]::IsNullOrEmpty($Name)) {
 				# By CONVENTION, @ReturnValue is the $Name most commonly used by ADO.NET and so on - so, default to conventions if no explicit values.
 				$Name = "@ReturnValue";
 			}
 			
-			if ([PSI.Models.PsiType]::NotSet -eq $pType) {
-				$pType = [PSI.Models.PsiType]::Int;
+			if ([PSI.Models.DataType]::NotSet -eq $pType) {
+				$pType = [PSI.Models.DataType]::Int;
 			}
 		}
 	}
@@ -132,7 +132,7 @@ function Add-PsiParameter {
 	
 	if ($Size) {
 		# Syntactic-Sugar: Folks with .NET background might $Size -1 to achieve MAX versions. That's fine (not ideal, but fine). Just re-map for them. 
-		if ((-1 -eq $Size) -and ($Type -in @("char", "varchar", "Nchar", "Nvarchar", "binary", "varbinary"))) {
+		if ((-1 -eq $Size) -and ($Type -in @("char", "varchar", "nchar", "nvarchar", "binary", "varbinary"))) {
 			$Type = $Type + "MAX";
 			$Size = $null;
 		}
@@ -159,7 +159,7 @@ function Add-PsiParameter {
 	else {
 		# actually, think i'll just force RETURN params to have @ReturnValue as the name, right?
 		# that said, OLEDB and ODBC don't even require params, do they? so... maybe just @p1, @p2, @p3 for them? 
-		if ($pDirection -ne [PSI.Models.PDirection]::Return) {
+		if ($pDirection -ne [PSI.Models.ParameterDirection]::Return) {
 			throw "only return params can NOT have a name...";
 		}
 	}
@@ -190,7 +190,8 @@ filter Expand-SerializedParameters {
 		[string]$Name = $global:PsiDefaultParameterSetName
 	);
 	
-	return $global:PsiParameterManager.ParameterSetFromSerializedInput($Parameters, $Name);
+	#return $global:PsiParameterManager.ParameterSetFromSerializedInput($Parameters, $Name);
+	return [Psi.Models.ParameterSet]::ParameterSetFromSerializedInput($Parameters, $Name);
 }
 
 <# 

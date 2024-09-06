@@ -178,6 +178,7 @@ public class ParsedBatch(int start, int end, string text, TextSources sources)
 
     public List<Comment> Comments { get; internal set; }
     public List<BlockComment> BlockComments { get; internal set; }
+    public List<CodeString> Strings { get; internal set; }
 
     public List<UseDirective> UseDirectives
     {
@@ -415,6 +416,7 @@ public class Tokenizer(string rawText) : ITokenizer
         {
             batch.Comments = this.GetCommentsForBatch(batch.StartIndex, batch.EndIndex);
             batch.BlockComments = this.GetBlockCommentsForBatch(batch.StartIndex, batch.EndIndex);
+            batch.Strings = this.GetStringsForBatch(batch.StartIndex, batch.EndIndex);
         }
 
         // !!!! TODO: 
@@ -441,6 +443,8 @@ public class Tokenizer(string rawText) : ITokenizer
         this._newlineIndexes.Push(this.CurrentIndex + 1);
     }
 
+    // REFACTOR: I've got 3x copy/paste/tweak iterations here for different <T> ... i just need 1x Generic implementation.
+    //          er, well... .IsUnicode is a bit of an oddity... but, i guess if I can .copy/.clone each <T> then ... i'm fine. 
     private List<Comment> GetCommentsForBatch(int startIndex, int endIndex)
     {
         var output = new List<Comment>();
@@ -460,6 +464,18 @@ public class Tokenizer(string rawText) : ITokenizer
         {
             if (comment.StartIndex >= startIndex && comment.EndIndex <= endIndex)
                 output.Add(new BlockComment(comment.StartIndex - startIndex, comment.EndIndex - startIndex, comment.Text));
+        }
+
+        return output;
+    }
+
+    private List<CodeString> GetStringsForBatch(int startIndex, int endIndex)
+    {
+        var output = new List<CodeString>();
+        foreach (var codeString in this.Strings)
+        {
+            if (codeString.StartIndex >= startIndex && codeString.EndIndex <= endIndex)
+                output.Add(new CodeString(codeString.StartIndex, codeString.EndIndex, codeString.Text, codeString.IsUnicode));
         }
 
         return output;

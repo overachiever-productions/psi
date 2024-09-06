@@ -2,13 +2,16 @@
 
 # 1. Import CLR Types: 
 [string]$ScriptRoot = $PSScriptRoot;
-	
+
 $classFiles = @(
+	# TODO: change \clr\ to \dotnet\ 
 	"$ScriptRoot\clr\PSI.Models\Global.cs"
 	"$ScriptRoot\clr\PSI.Models\Enums.cs"
 	"$ScriptRoot\clr\PSI.Models\Connection.cs"
+	"$ScriptRoot\clr\PSI.Models\OptionSets.cs"
 	"$ScriptRoot\clr\PSI.Models\Command.cs"
-	"$ScriptRoot\clr\PSI.Models\Parameter.cs"
+	"$ScriptRoot\clr\PSI.Models\Batches.cs"
+	"$ScriptRoot\clr\PSI.Models\Parameters.cs"
 	"$ScriptRoot\clr\PSI.Models\Tokenizer.cs"
 	"$ScriptRoot\clr\PSI.Models\TokenHandlers.cs"
 );

@@ -10,9 +10,7 @@
         public int Precision { get; internal set; }
         public int Scale { get; internal set; }
 
-        internal Parameter()
-        {
-        }
+        internal Parameter() { }
 
         // TODO: maybe make VALUE, size, precision, and scope all NULLable instead of the -1 (and meh it might be null) approach I'm using now... 
         //      -1 is too ... magic-number-y.
@@ -20,9 +18,7 @@
         public Parameter(string name, DataType dataType, ParameterDirection direction, object value, int size = -1, int precision = -1, int scale = -1)
         {
             if (dataType == DataType.NotSet)
-            {
                 throw new InvalidOperationException("DataType inference is not yet supported. Please Specify a DataType... ");
-            }
 
             if (direction == ParameterDirection.NotSet)
                 direction = ParameterDirection.Input;
@@ -39,12 +35,14 @@
 
     public class ParameterSet
     {
-        public string SetName { get; set; }
+        private const string BOGUS_SET_NAME = "Psi_Bogus_C9F014B5-9C08-4C9D-B205-E3A7DFAB3C18";
+        public string ParameterSetName { get; private set; }
         public List<Parameter> Parameters { get; private set; }
 
-        internal ParameterSet()
+        internal ParameterSet(string parameterSetName)
         {
             this.Parameters = new List<Parameter>();
+            this.ParameterSetName = parameterSetName;
         }
 
         public void Add(Parameter added)
@@ -57,57 +55,17 @@
             //          - I can quickly check for existing param names 
             //          - When i get/iterate over List<Parameter> the params are in the ORDER they were added. 
             // in short, think of having both Dictionary<> and List<> as a weak-sauce doubly-linked-list or whatever. 
-
             this.Parameters.Add(added);
         }
-    }
 
-    public class ParameterSetManager
-    {
-        public Dictionary<string, ParameterSet> ParameterSets { get; private set; }
-
-        public static ParameterSetManager Instance => new ParameterSetManager();
-
-        private ParameterSetManager()
+        public static ParameterSet ParameterSetFromSerializedInput(string serializedParameters, string setName)
         {
-            this.ParameterSets = new Dictionary<string, ParameterSet>();
-        }
+            ParameterSet output = new ParameterSet(setName);
 
-        public void AddParameterSet(string name)
-        {
-            if (this.ParameterSets.ContainsKey(name))
-                throw new InvalidOperationException($"A ParameterSet with the name of [{name}] already exists.");
-
-            ParameterSet newSet = new ParameterSet { SetName = name };
-
-            this.ParameterSets.Add(name, newSet);
-        }
-
-        public void AddParameterToSet(string set, Parameter added)
-        {
-            ParameterSet target = this.ParameterSets[set];
-            if (target == null)
-                throw new InvalidOperationException("Set not found");
-
-            target.Add(added);
-        }
-
-        public ParameterSet GetParameterSetByName(string name)
-        {
-            return this.ParameterSets[name];
-        }
-
-        public void RemoveParameterSet(string name)
-        {
-            this.ParameterSets.Remove(name);
-        }
-
-        public ParameterSet ParameterSetFromSerializedInput(string serializedParameters, string setName)
-        {
             // TODO ... validate that the string isn't null/empty... and that it meets 'basic' requirements
             //  or, maybe just wrap everything in try catch? 
 
-            // TODO: splitting on , won't work if there's a decimal/numeric in the mix... cuz ... that'll be @something decimal(8,2) or whatever..
+            // TODO: splitting on "," won't work if there's a decimal/numeric in the mix... cuz ... that'll be @something decimal(8,2) or whatever..
             //      so, I'm going to have to find a solid REGEX that accounts for this. 
             //      OR... I'm going to have to cheat and see if numeric/decimal exists in the string in question and .. if so ... replace the , inside the (,) ... with something else... 
             //      i.e., either I get a single regex that IGNOREs commas inside of () or ... i find all , inside of () + make sure they're part of decimal/numeric and ... 'replace' them to 
@@ -117,11 +75,6 @@
                     "Decimal and Numeric parameters are not yet supported - they gunk-up parsing logic (for now).");
 
             string[] parameters = serializedParameters.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            // REFACTOR? this is all a bit clunky - but needed to 'overwrite' the default parameter set:
-            this.RemoveParameterSet(setName);
-            this.AddParameterSet(setName);
-            ParameterSet output = GetParameterSetByName(setName);
 
             foreach (string parameter in parameters)
             {
@@ -266,6 +219,60 @@
             }
 
             return output;
+        }
+
+        public static ParameterSet EmptyParameterSet()
+        {
+            return new ParameterSet(BOGUS_SET_NAME);
+        }
+
+        public bool IsPlaceHolderParameterSetOnly
+        {
+            get
+            {
+                return this.ParameterSetName == BOGUS_SET_NAME;
+            }
+        }
+    }
+
+    public class ParameterSetManager
+    {
+        public Dictionary<string, ParameterSet> ParameterSets { get; private set; }
+
+        public static ParameterSetManager Instance => new ParameterSetManager();
+
+        private ParameterSetManager()
+        {
+            this.ParameterSets = new Dictionary<string, ParameterSet>();
+        }
+
+        public void AddParameterSet(string name)
+        {
+            if (this.ParameterSets.ContainsKey(name))
+                throw new InvalidOperationException($"A ParameterSet with the name of [{name}] already exists.");
+
+            ParameterSet newSet = new ParameterSet(name);
+
+            this.ParameterSets.Add(name, newSet);
+        }
+
+        public void AddParameterToSet(string set, Parameter added)
+        {
+            ParameterSet target = this.ParameterSets[set];
+            if (target == null)
+                throw new InvalidOperationException("Set not found");
+
+            target.Add(added);
+        }
+
+        public ParameterSet GetParameterSetByName(string name)
+        {
+            return this.ParameterSets[name];
+        }
+
+        public void RemoveParameterSet(string name)
+        {
+            this.ParameterSets.Remove(name);
         }
     }
 

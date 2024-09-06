@@ -22,13 +22,27 @@
 // https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15#ole-db-provider-connection-string-keywords
 // which means, I'm going to need something to abstract all of this 'stuff'
 
+public interface ICloneable<T>
+{
+    T Clone();
+}
 
-public class Connection
+public class Connection : ICloneable<Connection>
 {
     public string Server { get; protected set; }
     public FrameworkType Framework { get; private set; }
     public PSCredential Credential { get; private set; }
-    public string TargetDatabase { get; protected set; }
+    public string Database { get; protected set; } = "master";
+
+    public int ConnectionTimeout { get; set; } = -1;
+    public int CommandTimeout { get; set; } = -1;
+    public int QueryTimeout { get; set; } = -1;
+
+    public bool Encrypt { get; set; } = false;
+    public bool TrustServerCertificate { get; set; } = false;
+    public bool ReadOnly { get; set; } = false;
+
+    public string ApplicationName { get; set; } = "PSI.Command";
 
     protected Connection(FrameworkType frameworkType, string serverName)
     {
@@ -47,7 +61,16 @@ public class Connection
         return new Connection(frameworkType, serverName);
     }
 
-    public void AddCredential(PSCredential credential)
+    public Connection GetBatchConnection(PSCredential credential, string targetDatabase)
+    {
+        var output = this.Clone();
+        output.AddCredential(credential);
+        output.SetTargetDatabase(targetDatabase);
+
+        return output;
+    }
+
+    private void AddCredential(PSCredential credential)
     {
         if (credential.UserName == "Psi_Bogus_C9F014B5-9C08-4C9D-B205-E3A7DFAB3C18")
             return;  // this is a weird hack to avoid having to avoid branching logic within PowerShell funcs. 
@@ -55,8 +78,30 @@ public class Connection
         this.Credential = credential;
     }
 
-    public void SetTargetDatabase(string database)
+    private void SetTargetDatabase(string database)
     {
-        this.TargetDatabase = database;
+        this.Database = database;
+    }
+
+    public Connection Clone()
+    {
+        var output = new Connection(this.Framework, this.Server);
+        
+        output.ConnectionTimeout = this.ConnectionTimeout;
+        output.CommandTimeout = this.CommandTimeout;
+        output.QueryTimeout = this.QueryTimeout;
+
+        output.Encrypt = this.Encrypt;
+        output.TrustServerCertificate = this.TrustServerCertificate;
+        output.ReadOnly = this.ReadOnly;
+
+        output.ApplicationName = this.ApplicationName;
+
+        // TODO: if there's existing ConnectionString info... then output.ConnString = this.ConnString
+        // OR... whatever makes sense to 'copy out' ... 
+        // etc. 
+
+
+        return output;
     }
 }

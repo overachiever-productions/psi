@@ -4,153 +4,108 @@
 	
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 
+
+# $results += Execute-Batch -Framework $Framework -Batch $batch -Connection $batchConnection -Parameters $paramSet;
+
 #>
 
-
-function Invoke-DatabaseCommand {
+function Execute-Batch {
 	[CmdletBinding()]
 	param (
-		[string]$Command = $null,
-		[string]$SprocName = $null,  # one or the other - i.e., either a command or ... a sproc-name.
-		[string]$CommandType,			# same-ish as the above - i.e., dictates what we're using and ... should match
-		[PSI.Models.ParameterSet]$Parameters = $null,
-		[string]$ConnectionString,
-		[int]$ConnectionTimeout = -1,
-		[int]$CommandTimeout = -1,
-		[int]$QueryTimeout = -1,
-		[string]$ApplicationName,
+		[Parameter(Mandatory)]
 		[string]$Framework,
-		
-		# not sure how to handle these... 
-		[switch]$ReadOnly = $false,
-		[switch]$Encrypt = $true,
-		[switch]$TrustServerCert = $true
-#		[switch]$AsDataSet = $false,
-#		[switch]$AsDataTable = $false,
-#		[switch]$AsDataRow = $false,
-#		[switch]$AsScalar = $false,
-#		[switch]$AsNonQuery = $false,
-#		[switch]$AsJson = $false,
-#		[switch]$AsXml = $false
+		[Parameter(Mandatory)]
+		[PSI.Models.Connection]$Connection,
+		[Parameter(Mandatory)]
+		[PSI.Models.Batch]$Batch,
+		[PSI.Models.OptionSet]$SetOptions = $null,
+		[PSI.Models.ParameterSet]$Parameters = $null,
+		[int]$BatchNumber
 	);
 	
 	begin {
-		# validations / etc. 
+		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch);
+		# TODO: bind other 'outputs' to  $batchResult (i.e., expand comments and handle this 'stuff')
+<#
+		# NOTE ... $batchResult is where I'm going to bind things like the connection-details
+		# 			such as ... 
+		#					.server, .user, etc.   (conn Properties)
+		# 				.parameters (including outputs) (parameters)
+		# 				. SetOptions ... 
+		# 				.dataset 
+		# 				.printed (collection of strings/printed outputs... )
+		# 				.result-type
+		# 				.framework info... (OLEDB, ODBC, SQLClient, etc. )
+		
+		
+		# OTHER THINGS to bundle (i.e.., early/previous notes):
+		# 	new CommandThingy - with following Props: 
+		# 		.ConnectionString 
+		# 		. 	Database (or is that part of the above - think it's both ... i.e., want to know which DB we connected against for history - but conn-string needs to be done/complete)
+		# 		. 	Server (yeah, same as above)
+		# 		. 	Framework (ditto - needs to be part of connstring - but also want to track it)
+		# 		. 	AppName (ditto)
+		# 		. 	Command - but this'll be per each GO-d block... 
+		# 		. 	Command-type 
+		# 		. 	Encrypt/Read-Only (AG)/TrustServer - i.e., these are all details. 
+		# 		. 	SET options and other conn-string details. (like arithabort, ansi_nulls, etc)
+		# 	so... use a .Connection object - with all of the props above - and ... .GetConnectionString() as a serialization func (that can't be leaked/output)
+		# 		.ResultType (as x, y, or z - but only 1 option)
+		# 		.Timeouts
+		# 		. 	Connection (this'll have to be copied to .Connection object)
+		# 		. 	Command  which is either a sproc name or a Batch/ParsedBatch... 
+		# 		.  				
+#>		
 	}
 	
 	process {
 		try {
-			$conn = Get-ConnectionObject -Framework $provider;
-			# TODO: https://overachieverllc.atlassian.net/browse/PSI-23 
-			$conn.ConnectionString = Get-ConnectionString -Framework $provider -Server $SqlInstance -Database $Database -SqlCredential $SqlCredential -ConnectionString $ConnectionString;
+			$conn = Get-ConnectionObject -Framework $Framework -Connection $Connection -BatchResult $batchResult;
 			
-			if ($ConnectionTimeout -gt 0) {
-				$conn.ConnectionTimeout = $ConnectionTimeout;
-			}
-			
-			$cmd = Get-CommandObject -Framework $provider;
+			$cmd = Get-CommandObject -Framework $Framework;
 			$cmd.Connection = $conn;
-			$cmd.CommandText = $Query;
-			$cmd.CommandType = $CommandType;
-			
-			if ($CommandTimeout -gt 0) {
-				$cmd.CommandTimeout = $CommandTimeout;
-			}
-			
-			if (-not ([string]::IsNullOrEmpty($ParameterString))) {
-				if ($Parameters) {
-					throw "Invalid Arguments. Only -Parameters OR -ParameterString can be used - not BOTH.";
-				}
-				
-				$Parameters = Expand-SerializedParameters -Parameters $ParameterString;
-			}
+			$cmd.CommandText = $Batch.BatchText;
+			$cmd.CommandType = $Batch.CommandType;
 			
 			if ($Parameters) {
-				Bind-Parameters -Framework $provider -Command $cmd -Parameters $Parameters;
+				Bind-Parameters -Framework $Framework -Command $cmd -Parameters $Parameters;
 			}
 			
-			# MKC: Hmm. What IF I created a PsiDataSet - which 'derived from' System.Data.DataSet and which had a few extra 'goodies' or details
-			# 		such as: .SourceCommand, .ServerName(beingExecutedAgainst), .PrintedOutput, .ParameterOutputs ... 
-			# 			at that point, I'd then have ... everything I need for a given 'result'/operation against the server
-			# 				and would JUST need to figure out a way of 'chunking' the $Query being passed in (i.e., split against GO (#) ... and then
-			# 				wire up some sort of collection/container of these objects? )
 			$dataSet = New-Object System.Data.DataSet;
-			$adapter = Get-DataAdapter $provider;
+			Add-Member -InputObject $batchResult -MemberType NoteProperty -Name DataSet -Value $dataSet -Force;  # this is ... kind of nuts. 
 			
-			$adapter.SelectCommand = $cmd;
+			$adapter = Get-DataAdapter $Framework -Command $cmd;
 		}
 		catch {
-			# TODO: https://overachieverllc.atlassian.net/browse/PSI-15
-			throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)";
-			
-			# TODO: ... there's no 'finally' here that cleans up objects ... 
+			#throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
+			throw $_;
 		}
+		
+		# TODO: ... there's no 'finally' here that cleans up objects ... 
 		
 		try {
 			$conn.Open();
-			# TODO: https://overachieverllc.atlassian.net/browse/PSI-20 
+			
+			# DOH: right after the connection OPENS is a great time to execute SET options... BUT, that's too late in the pipeline... 
+			# 		i.e., previous to this - in the pi
+			# TODO: now that the connection is open (i.e., RIGHT after it opens) - fire off any $SetOptions that need 
+			# 		to be executed - as name-value pairs (e.g., "ANSI_NULLS OFF, QUOTED_IDENTS ON, etc.") (and while the sample syntax
+			# 			i just threw out is bogus, there are easy ways to combine set options... something that the dotNet OptionSet thingy
+			#				can/will handle. )
+			
 			$adapter.Fill($dataSet) | Out-Null;
+			
 			$conn.Close();
 		}
 		catch {
-			# TODO: https://overachieverllc.atlassian.net/browse/PSI-15
-			throw "EXECUTION ERROR: $_ ";
+			throw "EXECUTION ERROR: $_ "; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
 		}
 		finally {
 			$conn.Close();
 		}
-		
-		# Processing of outputs is a BIT complex. But the best way to tackle that is to:
-		# 	1. Check for any EXPLICIT -AsXXX output types first (going 'up' from smallest/least output type to largest output type)
-		# 	2. Once those EXPLICIT options are handled, try going 'down' from largest to smallest to return whatever makes the most SENSE. 
-		if ($AsNonQuery) {
-			return;
-		}
-		
-		if ($AsScalar -or $AsJson -or $AsXml) {
-			# convert if/as needed... otherwise ... output.
-			return $dataSet.Tables[0].Rows[0][0];
-			throw "Explicit -AsScalar, -AsJson, and -AsXml switches are not YET implemented.";
-		}
-		
-		if ($AsDataRow) {
-			return $dataSet.Tables[0].Rows[0];
-		}
-		
-		if ($AsDataTable) {
-			return $dataSet.Tables[0];
-		}
-		
-		# Done with 1 (going 'up' vs explicit output types) and ... starting to go 'down' implicit types (in single clause):
-		if (($AsDataSet) -or ($dataSet.Tables.Count -gt 1)) {
-			return $dataSet;
-		}
-		
-		$table = $dataSet.Tables[0];
-		if ($table.Rows.Count -gt 1) {
-			return $table;
-		}
-		
-		if ($table.Rows.Count -eq 0) {
-			return; # this is/was an 'implicit' -AsNonQuery
-		}
-		
-		$row = $table.Rows[0];
-		if ($row.Columns.Count -gt 1) {
-			return $row; # multiple columns - return the entire row.
-		}
-		
-		# There are 3x options for returning scalar values:
-		# 		a. Return the WHOLE ROW (even if it's just a single column-wide). This is what Invoke-SqlCmd does. 
-		# 		b. Create a custom PSObject with column-name and value results. CAN'T see ANY benefit to this over a data-row.
-		# 		c. No context info - just the scalar result itself (i.e., not the column-name - just the 'scalar value itself - fully isolated')/
-		# For now, Invoke-PsiCommand will leverage option A. 
-		return $row; # option C would be $row[0].	
-		
-		
 	}
 	
 	end {
-		
+		return $batchResult;
 	}
 }
