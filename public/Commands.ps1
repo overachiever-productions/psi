@@ -3,6 +3,13 @@
 <#
 	
 
+PICKUP/NEXT:
+- I want this to work: 
+Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_meta_fields" -SqlCredential (Get-Credential sa) -ConnectionTimeout 30;
+
+
+
+
 					#$query = Get-Content "D:\Dropbox\Desktop\.junk\psi_script_test.sql" -Raw;
 
 
@@ -43,8 +50,6 @@ END;
 "@
 
 
-
-
 	#$query = "SELECT * FROM dbo.Settings;";
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query $query -SqlCredential (Get-Credential sa) -ConnectionTimeout 30;
@@ -68,9 +73,6 @@ END;
 
 
 #>
-
-
-
 
 function Get-PsiConnectionString {
 	# for more 'advanced' options - i.e., pass in a bunch of arguments and such to this func... 
@@ -104,9 +106,9 @@ function Invoke-PsiCommand {
 		[int]$QueryTimeout = -1,
 		[Alias("AppName")]
 		[string]$ApplicationName = "PSI.Command",		# TODO: possibly use "reflection" to get module version and shove it in to app name? e.g., "PSI.Command (1.2)"
-		[ValidateSet("AUTO", "ODBC", "OLEDB", "SQLClient")]
-		[Alias("Driver", "Provider")]
-		[string]$Framework = "AUTO",
+#		[ValidateSet("AUTO", "System", "Microsoft")]
+#		[Alias("Driver", "Provider")]
+#		[string]$Framework = "AUTO",
 		[switch]$ReadOnly = $false,
 		[switch]$Encrypt = $true,
 		[switch]$TrustServerCert = $true,
@@ -146,9 +148,9 @@ function Invoke-PsiCommand {
 			$resultType = $outputType.Name;
 		}
 		
-		if ($Framework -eq "AUTO") {
+		#if ($Framework -eq "AUTO") {
 			$Framework = Get-FrameworkProvider;
-		}
+		#}
 		
 		[PSI.Models.BatchResult[]]$results = @();
 	}

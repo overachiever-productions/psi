@@ -5,26 +5,25 @@
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	
 	$parameters = New-PsiParameterSet;  # REFACTOR: $parameters = New-Parameters or New-PsiParameters ... 
-	#Add-PsiParameter -Direction Return;   # REFACTOR: Add-Parameter or Add-PsiParameter
-	#Add-PsiParameter -Name "@JobName" -Type "Sysname" -Value "Fake Job";
-
-	$query = "SELECT 
-			ISNULL(MAX(s.[enabled]), 0) [enabled]
-		FROM 
-			msdb.dbo.sysjobs j 
-			INNER JOIN msdb.dbo.[sysjobschedules] js ON [j].[job_id] = [js].[job_id]
-			INNER JOIN msdb.dbo.[sysschedules] s ON [js].[schedule_id] = [s].[schedule_id]
-		WHERE 
-			j.[name] = @JobName; ";
+#	#Add-PsiParameter -Direction Return;   # REFACTOR: Add-Parameter or Add-PsiParameter
+#	#Add-PsiParameter -Name "@JobName" -Type "Sysname" -Value "Fake Job";
+#
+#	$query = "SELECT 
+#			ISNULL(MAX(s.[enabled]), 0) [enabled]
+#		FROM 
+#			msdb.dbo.sysjobs j 
+#			INNER JOIN msdb.dbo.[sysjobschedules] js ON [j].[job_id] = [js].[job_id]
+#			INNER JOIN msdb.dbo.[sysschedules] s ON [js].[schedule_id] = [s].[schedule_id]
+#		WHERE 
+#			j.[name] = @JobName; ";
 
 	$query = "SELECT [name] FROM sys.databases WHERE [database_id] = @id";
 	#Add-PsiParameter -Direction Return;
 	Add-PsiParameter -Name "id" -Type "Int" -Value 11;
 
-$parameters;
+#$parameters;
 
-
-	Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -Credentials (Get-Credential sa) -Query $query -Parameters $parameters -Provider SQLClient;
+	Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database msdb -SqlCredential (Get-Credential sa) -Query $query -Parameters $parameters;
 	
 
 #>
@@ -158,7 +157,6 @@ function Add-PsiParameter {
 	}
 	else {
 		# actually, think i'll just force RETURN params to have @ReturnValue as the name, right?
-		# that said, OLEDB and ODBC don't even require params, do they? so... maybe just @p1, @p2, @p3 for them? 
 		if ($pDirection -ne [PSI.Models.ParameterDirection]::Return) {
 			throw "only return params can NOT have a name...";
 		}
@@ -190,41 +188,12 @@ filter Expand-SerializedParameters {
 		[string]$Name = $global:PsiDefaultParameterSetName
 	);
 	
-	#return $global:PsiParameterManager.ParameterSetFromSerializedInput($Parameters, $Name);
 	return [Psi.Models.ParameterSet]::ParameterSetFromSerializedInput($Parameters, $Name);
 }
 
-<# 
-	Disclaimer about VERSIONING HELL. 
-	What I WANTED: 
-		3x overloads in C# (i.e., in the PsiMapper.cs file) that looked like: 
-			- public static void LoadParameters(SqlCommand command, ParameterSet parameters){}
-			- public static void LoadParameters(OdbcCommand command, ParameterSet parameters){}
-			- public static void LoadParameters(OleDbCommand command, ParameterSet parameters){}
-
-		and then, from PsiCommand - just call: [PSI.Models.PsiMapper].LoadParameters($cmd, $Parameters). 
-		TYPE detection would have 'routed' to the proper command and ... i'd have some wire-up operations/glue as needed...
-
-	What HAPPENED: 
-		1. I had to add NUGET packages for System.Data.SqlClient|Odbc|OleDb to my .NET project. (no biggie)
-		2. I got this ERROR when trying to Add-Type against my dot-included .cs files: 
-				The type name 'OdbcCommand' could not be found in the namespace 'System.Data.Odbc'. 
-					This type has been forwarded to assembly 'System.Data.Odbc, Version=0.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51' 
-					Consider adding a reference to that assembly.         
-
-		Or, in other words, to get my 'type-routing' fun to work ...  I would have had to import THOSE specific references. 
-			Which... yeah - could work. 
-				BUT, then I'd be TYING this implementation to HARD-CODED versions of System.Data.xxxx functionality. 
-			Which... would be DUMB cuz... I've ALREADY got access to all 3x implementations via PowerShell (i.e., whatever I'm 'sitting on' to write this code). 
-				AND, those implementations 'go with' whatever PoshFramework this code is running on. 
-
-			So, short of figuring out how to ... redirect the C# compiler part of Posh to "Hey, use the versions of SqlClient, ODBC, and OLEDB you already have loaded" ... 
-				the easier option, sigh, was to do all of said mapping in .... Posh.
-
-#>
 filter Bind-Parameters {
 	param (
-		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
+		[ValidateSet("System", "Microsoft")]
 		[Parameter(Mandatory)]
 		[string]$Framework,
 		[Parameter(Mandatory)]
@@ -235,313 +204,15 @@ filter Bind-Parameters {
 	
 	# Jackpot: These are the core docs I need: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
 	switch ($Framework) {
-		"ODBC"	 {
-			foreach ($parameter in $Parameters.Parameters) {
-				Bind-OdbcParameter -Command $Command -Parameter $parameter;
-				# ODBC doesn't allow @namedParams (in the Command itself) for TEXT operations:
-				# 	fodder: 
-				# 		https://stackoverflow.com/questions/1535994/asp-net-odbc-query-with-parameters
-				# 		https://stackoverflow.com/questions/32196416/select-query-does-not-work-with-parameters-using-parameters-addwithvalue
-				if ("Text" -eq $Command.CommandType) {
-					$cmd.CommandText = $cmd.CommandText.replace($parameter.Name, '?');
-				}
-			}
-		}
-		"OLEDB" {
-			foreach ($parameter in $Parameters.Parameters) {
-				Bind-OleDbParameter -Command $Command -Parameter $parameter;
-				
-				# TODO: OLEDB doesn't allow named parameters in some cases either... 
-			}
-		}
-		"SQLClient" {
+		"System" {
 			foreach ($parameter in $Parameters.Parameters) {
 				Bind-SqlClientParameter -Command $Command -Parameter $parameter;
 			}
 		}
 		default {
-			throw "Invalid -Framework. The Framework [$Framework] is not recognized.";
+			throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
 		}
 	}
-}
-
-filter Bind-OdbcParameter {
-	param (
-		[Parameter(Mandatory)]
-		[System.Data.Odbc.OdbcCommand]$Command,
-		[Parameter(Mandatory)]
-		[PSI.Models.Parameter]$Parameter
-	);
-	
-	if ("Return" -eq $Parameter.Direction) {
-		# see https://overachieverllc.atlassian.net/browse/PSI-5 
-		if ("Text" -eq $Command.CommandType) {
-			throw "RETURN Parameter Types are NOT supported for Text operations.";
-		}
-	}
-	
-	if ($Parameter.Direction -notin @("Input", "InputOutput", "Output", "Return")) {
-		throw "Psi Framwork Error. Invalid PsiParameter Direction Specified.";
-	}
-	
-	$direction = ConvertTo-SystemParameterDirection -Direction $Parameter.Direction;
-	[int]$size = $null;
-	[int]$precision = $null;
-	[int]$scale = $null;
-	
-	switch ($Parameter.Type) {
-		"NotSet" {
-			throw "Psi Framwork Error. PsiType has not been correctly set.";
-		}
-		{
-			$_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "Date", "Time", "SmallDateTime", "DateTime", "UniqueIdentifier", "Real")
-		} {
-			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
-		}
-		{
-			$_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary")
-		} {
-			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
-			$size = $Parameter.Size;
-		}
-		{
-			$_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")
-		} {
-			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
-			$size = -1;
-		}
-		{
-			$_ -in @("Decimal", "Numeric")
-		} {
-			# ODBC implements as Numeric (for both): https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-			$typ = [System.Data.Odbc.OdbcType]::Numeric;
-			$precision = $Parameter.Precision;
-			$scale = $Parameter.Scale;
-		}
-		{
-			$_ -in @("Image", "Text", "NText")
-		} {
-			# TODO: optional WARN on deprecated SQL Server types... 
-			$type = [System.Data.Odbc.OdbcType]([Enum]::Parse([System.Data.Odbc.OdbcType], $Parameter.Type, $true));
-		}
-		"Sysname" {
-			$type = [System.Data.Odbc.OdbcType]::NVarChar;
-			$size = 256;
-		}
-		"SmallMoney" {
-			# TODO: hmmm
-		}
-		"Money" {
-			# NOT supported: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-			# but, honestly? why not pass this in as a decimal or ... possibly even real/float?
-		}
-		"Float" {
-			$type = [System.Data.Odbc.OdbcType]::Double;
-		}
-		"DateTime2" {
-			# Fodder: https://learn.microsoft.com/en-us/sql/relational-databases/native-client-odbc-date-time/enhanced-date-and-time-type-behavior-with-previous-sql-server-versions-odbc?view=sql-server-ver16 
-			# Fodder: https://stackoverflow.com/questions/1334143/datetime2-vs-datetime-in-sql-server 
-			# TODO: need to figure out how to specify this... 
-			$type = [System.Data.Odbc.OdbcType]::DateTime;
-		}
-		"DateTimeOffset" {
-			# not explicitly supported. Might be a work-around option for passing it in as a string?
-			# https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-		}
-		"SqlVariant" {
-			# NOT supported: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types 
-			# could try to coerce to a string ... but think that's going to be an ugly problem. 
-			# instead, should probably THROW about these NOT being supported via ODBC?
-		}
-		"Geometry" {
-			# Probably CAN'T Support. Given that MS doesn't support it ... not sure how I can get their DRIVER to support it. 
-			# 	instead, think i just need to provide info about work-arounds for this.
-		}
-		"Geography" {
-			# ditto. 
-		}
-		"TimeStamp" {
-			# yeah... ODBC.TimeStamp = SQL_BINARY stream... don't think i want to use this.. 
-			$type = [System.Data.Odbc.OdbcType]::Timestamp;
-		}
-		"Xml" {
-			#$p = New-OdbcParameter -Name $Parameter.Name -Type  -Direction $direction;
-		}
-		default {
-			throw "not valid PsiType... no mapping could be made.";
-		}
-	}
-	
-	$added = New-Object System.Data.Odbc.OdbcParameter($Parameter.Name, $type);
-	$added.Direction = $direction;
-	
-	if ($Parameter.Value) {
-		$added.Value = $Parameter.Value;
-	}
-	else {
-		$added.Value = [System.DBNull];
-	}
-	
-	if ($size) {
-		$added.Size = $size;
-	}
-	
-	if ($precision) {
-		$added.Precision = $precision;
-		$added.Scale = $scale;
-	}
-	
-	$Command.Parameters.Add($added) | Out-Null;
-}
-
-filter Bind-OleDbParameter {
-	param (
-		[Parameter(Mandatory)]
-		[System.Data.Oledb.OleDbCommand]$Command,
-		[Parameter(Mandatory)]
-		[PSI.Models.Parameter]$Parameter
-	);
-	
-	if ("Return" -eq $Parameter.Direction) {
-		# see https://overachieverllc.atlassian.net/browse/PSI-5 
-		if ("Text" -eq $Command.CommandType) {
-			throw "RETURN Parameter Types are NOT supported for Text operations.";
-		}
-	}
-	
-	if ($Parameter.Direction -notin @("Input", "InputOutput", "Output", "Return")) {
-		throw "Psi Framwork Error. Invalid PsiParameter Direction Specified.";
-	}
-	
-	$direction = ConvertTo-SystemParameterDirection -Direction $Parameter.Direction;
-	[int]$size = $null;
-	[int]$precision = $null;
-	[int]$scale = $null;
-	
-	switch ($Parameter.Type) {
-		"NotSet" {
-			throw "Psi Framwork Error. PsiType has not been correctly set.";
-		}
-		{
-			$_ -in @("SmallInt", "BigInt", "Decimal", "Numeric")
-		} {
-			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
-		}
-		"Bit" {
-			$type = [System.Data.OleDb.OleDbType]::Boolean;
-		}
-		"TinyInt" {
-			$type = [System.Data.OleDb.OleDbType]::UnsignedTinyInt;
-		}
-		"Int" {
-			$type = [System.Data.OleDb.OleDbType]::Integer;
-		}
-		{
-			$_ -in @("Char", "Varchar", "Binary", "Varbinary")
-		} {
-			$type = [System.Data.Oledb.OledbType]([Enum]::Parse([System.Data.Oledb.OledbType], $Parameter.Type, $true));
-			$size = $Parameter.Size;
-		}
-		"VarcharMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarChar;
-		}
-		"NChar" {
-			$type = [System.Data.OleDb.OleDbType]::WChar;
-			$size = $Parameter.Size;
-		}
-		"NVarchar" {
-			$type = [System.Data.OleDb.OleDbType]::VarWChar;
-			$size = $Parameter.Size;
-		}
-		"NVarcharMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarWChar;
-		}
-		"VarbinaryMax" {
-			$type = [System.Data.OleDb.OleDbType]::LongVarBinary;
-		}
-		"Money" {
-			$type = [System.Data.OleDb.OleDbType]::Currency;
-		}
-		"Float" {
-			$type = [System.Data.OleDb.OleDbType]::Double;
-		}
-		"Real" {
-			$type = [System.Data.OleDb.OleDbType]::Single;
-		}
-		"Date" {
-			$type = [System.Data.OleDb.OleDbType]::DBDate;
-		}
-		"Time" {
-			$type = [System.Data.OleDb.OleDbType]::DBTime;
-		}
-		"SmallMoney" {
-			# TODO: see if mapping as Currency works... 
-		}
-		"SmallDateTime" {
-			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
-		}
-		"DateTime" {
-			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
-		}
-		"DateTime2" {
-			$type = [System.Data.OleDb.OleDbType]::DBTimeStamp;
-		}
-		"DateTimeOffset" {
-			# not explicitly supported. Might be a work-around option for passing it in as a string?
-			# https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
-		}
-		"UniqueIdentifier" {
-			$type = [System.Data.OleDb.OleDbType]::Guid;
-		}
-		"Image" {
-			#hmmmm.
-		}
-		"Text" {
-			#hmmmm.
-		}
-		"NText" {
-			#hmmmm.
-		}
-		"SqlVariant" {
-			$type = [System.Data.OleDb.OleDbType]::Variant;
-		}
-		"Geometry" {
-		}
-		"Geography" {
-		}
-		"TimeStamp" {
-		}
-		"Xml" {
-		}
-		"Sysname" {
-			$type = [System.Data.OleDb.OleDbType]::VarWChar;
-			$size = 256;
-		}
-		default {
-			throw "not valid PsiType... no mapping could be made.";
-		}
-	}
-	
-	$added = New-Object System.Data.OleDb.OleDbParameter($Parameter.Name, $type);
-	$added.Direction = $direction;
-	
-	if ($Parameter.Value) {
-		$added.Value = $Parameter.Value;
-	}
-	else {
-		$added.Value = [System.DBNull];
-	}
-	
-	if ($size) {
-		$added.Size = $size;
-	}
-	
-	if ($precision) {
-		$added.Precision = $precision;
-		$added.Scale = $scale;
-	}
-	
-	$Command.Parameters.Add($added) | Out-Null;
 }
 
 filter Bind-SqlClientParameter {
@@ -568,7 +239,7 @@ filter Bind-SqlClientParameter {
 	[int]$precision = $null;
 	[int]$scale = $null;
 	
-	switch ($Parameter.Type) {
+	switch ($Parameter.DataType) {
 		"NotSet" {
 			throw "Psi Framwork Error.";
 		}
@@ -576,18 +247,18 @@ filter Bind-SqlClientParameter {
 			$_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float",
 				"Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier")
 		} {
-			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 		}
 		{
 			$_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2")
 		} {
-			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 			$size = $Parameter.Size;
 		}
 		{
 			$_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")
 		} {
-			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.Type, $true));
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 			$size = -1;
 		}
 		{
@@ -655,7 +326,7 @@ filter Bind-SqlClientParameter {
 filter ConvertTo-SystemParameterDirection {
 	param (
 		[Parameter(Mandatory)]
-		[PSI.Models.PDirection]$Direction
+		[PSI.Models.ParameterDirection]$Direction
 	);
 	
 	switch ($Direction) {

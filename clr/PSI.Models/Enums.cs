@@ -9,9 +9,8 @@ public enum CommandType
 public enum FrameworkType
 {
     NotSet,
-    SqlClient,
-    OleDb,
-    Odbc
+    System,
+    Microsoft
 }
 
 public enum ResultType

@@ -1,41 +1,18 @@
 ﻿Set-StrictMode -Version 3.0;
 
-<#
-
-	Framework Docs: 
-
-		CLR / .NET 4.8 
-			System.Data.SqlClient: https://learn.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlconnection.fireinfomessageeventonusererrors?view=netframework-4.8.1 
-
-		
-		.NET 8 
-			ODBC: 			https://learn.microsoft.com/en-us/dotnet/api/system.data.odbc.odbcconnection?view=net-8.0
-			OLEDB: 			https://learn.microsoft.com/en-us/dotnet/api/system.data.oledb?view=net-8.0
-			SQLClient: 	
-				=> sigh... it's part of Microsoft.Data.SqlClient - which is fine. 
-				BUT... that's not documented in .NET 8 'stuff'. 
-					it's documented as .NET Standard 
-							https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlconnection?view=sqlclient-dotnet-standard-5.2
-
-
-#>
-
-
 filter Get-FrameworkProvider {
-	# TODO: might also make sense to look to see which drivers are installed on box. 
 	
-	$poshVersion = $PSVersionTable.PSVersion;
-	if ($poshVersion.Major -ge 5) {
-		return "SQLClient";
-	}
+	#TODO: It'll probably make most sense to evaluate which version of .NET is being run (e.g., .NET Framework/WindowsPowershell get System)
+	# 	whereas .NET 8 ... SYstem, but .NET 9? ... would get Microsoft, etc.
 	
-	return "SQLClient";
+	return "System";
 }
 
 function Get-ConnectionObject {
 	[CmdletBinding()]
 	param (
-		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
+		[ValidateSet("System", "Microsoft")]
+		[Parameter(Mandatory)]
 		[string]$Framework,
 		[Parameter(Mandatory)]
 		[PSI.Models.Connection]$Connection,
@@ -46,43 +23,28 @@ function Get-ConnectionObject {
 	process {
 		$connString = Get-ConnectionString -Framework $Framework -Connection $Connection;
 		
-		
-		# nice. I've got solid docs for all of the 'error' types  (i.e., what's returned from the INFO_MSGS)
-		# 	SqlClient has some 'extra' options/features: https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqlclient.sqlerror?view=sqlclient-dotnet-standard-5.2 
-		# 	ODBC and OLEDB are virtually identical: 
-		# 		https://learn.microsoft.com/en-us/dotnet/api/system.data.oledb.oledberror?view=net-8.0
-		# 		https://learn.microsoft.com/en-us/dotnet/api/system.data.odbc.odbcerror?view=net-8.0
-		
-		
 		$output = $null;
 		try {
 			switch ($Framework) {
-				"ODBC" {
-					$output = New-Object System.Data.Odbc.OdbcConnection($connString);
-					$infoHandler = [System.Data.Odbc.OdbcInfoMessageEventHandler] {
-						Get-SqlInfoDetails -ErrorCollection $_.Errors -Message $_.Message -Framework $Framework;
-					#	Write-Host "ODBC INFO: [$($_)])";
-					}
-					$output.Add_InfoMessage($infoHandler);
-				}
-				"OLEDB" {
-					$output = New-Object System.Data.OleDb.OleDbConnection($connString);
-					$infoHandler = [System.Data.OleDb.OleDbInfoMessageEventHandler] {
-						Get-SqlInfoDetails -ErrorCollection $_.Errors -Message $_.Message -Framework $Framework;
-						
-					#	Write-Host "OLEDB INFO: [$($_)])";
-					}
-					$output.Add_InfoMessage($infoHandler);
-				}
-				"SQLClient" {
+				"System" {
 					$output = New-Object System.Data.SqlClient.SqlConnection($connString);
 					$output.FireInfoMessageEventOnUserErrors = $true;
 					$infoHandler = [System.Data.SqlClient.SqlInfoMessageEventHandler] {
-						Get-SqlInfoDetails -ErrorCollection $_.Errors -Message $_.Message -Framework $Framework;
+						
+# PICKUP / NEXT: Assign the OUTPUT of the following call into something(s)
+						# 		and, potentially include line numbers and any OTHER details that SqlClient has that the OTHER clients did NOT. 
+						# 		then ... pass the OUTPUTs into $BatchResult.<whateverHandlerFuncNameApplies>()
+						Get-SqlInfoDetails -Framework $Framework -ErrorCollection $_.Errors -Message $_.Message;
 						
 						#$BatchResult.AddResultText($_);
 					}
 					$output.Add_InfoMessage($infoHandler);
+				}
+				"Microsoft" {
+					throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
+				}
+				default {
+					throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
 				}
 			}
 		}
@@ -102,7 +64,7 @@ function Get-ConnectionObject {
 			
 		}
 		catch {
-			throw "CONN TEST ERROR: $_";
+			throw "xCONN TEST ERROR: $_";
 		}
 		finally {
 			# anything I should be cleaning up here ? 			
@@ -114,23 +76,12 @@ function Get-ConnectionObject {
 
 function Get-SqlInfoDetails {
 	param (
+		[ValidateSet("System", "Microsoft")]
+		[Parameter(Mandatory)]
+		[string]$Framework,
 		$ErrorCollection,
-		[string]$Message,
-		[string]$Framework
+		[string]$Message
 	);
-	
-	# WEIRD. 
-	# 	- OLEDB DOESN'T treat PRINT outputs as errors. It ONLY provides 'Messages'
-	# 		PERIOD. 
-	# 	- ODBC ... on the other hand... provides all sorts of details - including 'USER ERRORs' - along with their Error #s (5701, 5703)
-	# 			AND uses a STATE of 0100 for these 'user errors'
-	# 			AND then REPEATS the damned things with a number of ... 0 
-	# 				AND when it repeats, the STATE then becomes 01S00 ... 
-	# 				honestly, ODBC is a fuggin' mess
-	# 		meanwhile, the .Source (of each ErrorMessage) within ODBC is: 
-	# 				NULL/EMPTY for the stupid 'user errors'
-	# 				and ... becomes "msodbcsql17.dll" for ... PRINT 'xxx' results. 
-	# 	- SqlClient ... does EVERYTHING 'right' - i.e., what I'd fully expect.
 	
 	Write-Host "  INFO MESSAGE: $Message";
 	
@@ -143,35 +94,27 @@ function Get-SqlInfoDetails {
 			Write-Host "		Number: $($rrr.Number)"
 			Write-Host "		Line #: $($rrr.LineNumber)"
 		}
-		else{
-			Write-Host "		State: $($rrr.SqlState)"
-			Write-Host "		Number: $($rrr.NativeError)"
-			Write-Host "		Ignored?  $($rrr.Source)"
-		}
 	}
 }
 
 function Get-CommandObject {
 	param (
-		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
-		[string]$Framework = "ODBC"
+		[ValidateSet("System", "Microsoft")]
+		[string]$Framework = "System"
 	);
 	
 	try {
 		switch ($Framework) {
-			"ODBC" {
-				return New-Object System.Data.Odbc.OdbcCommand;
-			}
-			"OLEDB" {
-				return New-Object System.Data.OleDb.OleDbCommand;
-			}
-			"SQLClient" {
+			"System" {
 				return New-Object System.Data.SqlClient.SqlCommand;
+			}
+			default{
+				throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
 			}
 		}
 	}
 	catch {
-		
+		throw "TODO: something ugly happening while getting COMMAND object: $_";
 	}
 	
 	throw "TODO: Improper Implementation of Get-CommandObject";
@@ -179,21 +122,18 @@ function Get-CommandObject {
 
 function Get-DataAdapter {
 	param (
-		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
-		[string]$Framework = "ODBC",
+		[ValidateSet("System", "Microsoft")]
+		[string]$Framework = "System",
 		$Command
 	);
 	
 	try {
 		switch ($Framework) {
-			"ODBC" {
-				return New-Object System.Data.Odbc.OdbcDataAdapter($Command);
-			}
-			"OLEDB" {
-				return New-Object System.Data.OleDb.OledbDataAdapter($Command);
-			}
-			"SQLClient" {
+			"System" {
 				return New-Object System.Data.SqlClient.SqlDataAdapter($Command);
+			}
+			default {
+				throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
 			}
 		}
 	}
@@ -207,7 +147,7 @@ function Get-DataAdapter {
 function Get-ConnectionString {
 	[CmdletBinding()]
 	param (
-		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
+		[ValidateSet("System", "Microsoft")]
 		[string]$Framework,
 		[Parameter(Mandatory)]
 		[PSI.Models.Connection]$Connection
@@ -224,27 +164,17 @@ function Get-ConnectionString {
 		}
 		
 		$constructedString = "";
+		# TODO: I probably no longer need this switch - unless Microsoft.Data.SqlClient provides different connection strings (which... it probably can due to different AUTH types?)
 		switch ($Framework) {
-			"ODBC" {
-				$constructedString = "Driver={ODBC Driver 17 for SQL Server}; Server=$($Connection.Server); Database=$($Connection.Database); Trusted_Connection=yes;";
-				
-				if ($Connection.Credential) {
-					$constructedString = "Driver={ODBC Driver 17 for SQL Server}; Server=$($Connection.Server); Database=$($Connection.Database); UID=$user; PWD=$pass;";
-				}
-			}
-			"OLEDB" {
-				$constructedString = "Provider=MSOLEDBSQL; Data Source=$($Connection.Server); Persist Security Info=True; Trusted_Connection=yes; Initial Catalog=$($Connection.Database);";
-				
-				if ($Connection.Credential) {
-					$constructedString = "Provider=MSOLEDBSQL; Data Source=$($Connection.Server); Persist Security Info=True; User ID=$user; Password=$pass; Initial Catalog=$($Connection.Database);";
-				}
-			}
-			"SQLClient" {
+			"System" {
 				$constructedString = "Data Source=$($Connection.Server); Persist Security Info=True; Trusted_Connection=yes; Initial Catalog=$($Connection.Database);";
 				
 				if ($Connection.Credential) {
 					$constructedString = "Data Source=$($Connection.Server); Persist Security Info=True; User ID=$user; Password=$pass;Initial Catalog=$($Connection.Database);";
 				}
+			}
+			default {
+				throw "System.Data.SqlClient is currently the ONLY supported -Framework.";
 			}
 		}
 		

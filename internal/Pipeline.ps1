@@ -26,36 +26,6 @@ function Execute-Batch {
 	begin {
 		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch);
 		# TODO: bind other 'outputs' to  $batchResult (i.e., expand comments and handle this 'stuff')
-<#
-		# NOTE ... $batchResult is where I'm going to bind things like the connection-details
-		# 			such as ... 
-		#					.server, .user, etc.   (conn Properties)
-		# 				.parameters (including outputs) (parameters)
-		# 				. SetOptions ... 
-		# 				.dataset 
-		# 				.printed (collection of strings/printed outputs... )
-		# 				.result-type
-		# 				.framework info... (OLEDB, ODBC, SQLClient, etc. )
-		
-		
-		# OTHER THINGS to bundle (i.e.., early/previous notes):
-		# 	new CommandThingy - with following Props: 
-		# 		.ConnectionString 
-		# 		. 	Database (or is that part of the above - think it's both ... i.e., want to know which DB we connected against for history - but conn-string needs to be done/complete)
-		# 		. 	Server (yeah, same as above)
-		# 		. 	Framework (ditto - needs to be part of connstring - but also want to track it)
-		# 		. 	AppName (ditto)
-		# 		. 	Command - but this'll be per each GO-d block... 
-		# 		. 	Command-type 
-		# 		. 	Encrypt/Read-Only (AG)/TrustServer - i.e., these are all details. 
-		# 		. 	SET options and other conn-string details. (like arithabort, ansi_nulls, etc)
-		# 	so... use a .Connection object - with all of the props above - and ... .GetConnectionString() as a serialization func (that can't be leaked/output)
-		# 		.ResultType (as x, y, or z - but only 1 option)
-		# 		.Timeouts
-		# 		. 	Connection (this'll have to be copied to .Connection object)
-		# 		. 	Command  which is either a sproc name or a Batch/ParsedBatch... 
-		# 		.  				
-#>		
 	}
 	
 	process {

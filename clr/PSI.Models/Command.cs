@@ -25,10 +25,13 @@ public class Command
 
     public List<Batch> GetBatches()
     {
-        if (CommandType == CommandType.Command)
-            return [new Batch(this.CommandType, this.ResultType, this.CommandText)];
-
         var output = new List<Batch>();
+
+        if (CommandType == CommandType.Command)
+        {
+            output.Add(new Batch(this.CommandType, this.ResultType, this.CommandText));
+            return output;
+        }
 
         var tokenizer = new Tokenizer(this.CommandText);
         tokenizer.Initialize();
