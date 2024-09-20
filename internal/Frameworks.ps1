@@ -29,14 +29,23 @@ function Get-ConnectionObject {
 				"System" {
 					$output = New-Object System.Data.SqlClient.SqlConnection($connString);
 					$output.FireInfoMessageEventOnUserErrors = $true;
+					
+					# DOCS: 
+					# 	SEVERITIES: https://learn.microsoft.com/en-us/sql/relational-databases/errors-events/database-engine-error-severities?view=sql-server-ver16
+					# 	ERROR OBJECT: https://learn.microsoft.com/en-us/dotnet/api/system.data.sqlclient.sqlerror?view=netframework-4.8.1					
 					$infoHandler = [System.Data.SqlClient.SqlInfoMessageEventHandler] {
+						param (
+							$sender,
+							$eventArgs
+						);
 						
-# PICKUP / NEXT: Assign the OUTPUT of the following call into something(s)
-						# 		and, potentially include line numbers and any OTHER details that SqlClient has that the OTHER clients did NOT. 
-						# 		then ... pass the OUTPUTs into $BatchResult.<whateverHandlerFuncNameApplies>()
-						Get-SqlInfoDetails -Framework $Framework -ErrorCollection $_.Errors -Message $_.Message;
-						
-						#$BatchResult.AddResultText($_);
+						foreach ($xput in $eventArgs.Errors) {
+							$printedOutput = New-Object Psi.Models.PrintedOutput($xput.Message, $xput.Class, $xput.State, $xput.Number, $xput.LineNumber);
+							$BatchResult.AddPrintedOutput($printedOutput);
+							
+							Write-Verbose "Msg $($xput.Number), Level $($xput.Class), State $($xput.State), Line $($xput.LineNumber)";
+							Write-Verbose "	$($xput.Message)";
+						}
 					}
 					$output.Add_InfoMessage($infoHandler);
 				}
@@ -67,46 +76,47 @@ function Get-ConnectionObject {
 			throw "xCONN TEST ERROR: $_";
 		}
 		finally {
-			# anything I should be cleaning up here ? 			
+			# anything I should be cleaning up here ? 	(i.e., "can't" dispose the connection - it's ... what I'm passing out. 
+			# but... command, and other things should be getting nuked, right? 
 		}
 		
 		return $output;
 	}
 }
 
-function Get-SqlInfoDetails {
-	param (
-		[ValidateSet("System", "Microsoft")]
-		[Parameter(Mandatory)]
-		[string]$Framework,
-		$ErrorCollection,
-		[string]$Message
-	);
-	
-	Write-Host "  INFO MESSAGE: $Message";
-	
-	Write-Host "	ERRORS: $($ErrorCollection.Count)"
-	foreach ($rrr in $ErrorCollection) {
-		
-		Write-Host "		Message: $($rrr.Message)"
-		if ("SQLCLIENT" -eq $Framework) {
-			Write-Host "		State: $($rrr.State)"
-			Write-Host "		Number: $($rrr.Number)"
-			Write-Host "		Line #: $($rrr.LineNumber)"
-		}
-	}
-}
-
 function Get-CommandObject {
 	param (
 		[ValidateSet("System", "Microsoft")]
-		[string]$Framework = "System"
+		[string]$Framework = "System",
+		[PSI.Models.BatchResult]$BatchResult
 	);
 	
 	try {
 		switch ($Framework) {
 			"System" {
-				return New-Object System.Data.SqlClient.SqlCommand;
+				$output = New-Object System.Data.SqlClient.SqlCommand;
+				$handler = [System.Data.StatementCompletedEventHandler] {
+					param (
+						$sender,
+						$eventArgs
+					);
+					
+					# DOCS: https://learn.microsoft.com/en-us/dotnet/api/system.data.statementcompletedeventargs?view=netframework-4.8.1
+					if ($BatchResult.AllowRowCounts) {
+						
+						$affected = "($($eventArgs.RecordCount) rows affected)";
+						if ($eventArgs.RecordCount -eq 1) {
+							$affected = $affected.Replace("rows", "row");
+						}
+						
+						$BatchResult.AddRowCount($affected, (Get-Date));
+						
+						Write-Verbose $affected;
+					}
+				}
+				
+				$output.Add_StatementCompleted($handler);
+				return $output;
 			}
 			default{
 				throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
@@ -189,53 +199,12 @@ function Get-ConnectionString {
 		# TODO: Address $Connection.
 		# 		.Encrypt 
 		# 		.TrustServerCertificate 
-		# 		.ReadOnly 	
-		
+		# 		.ReadOnly - i.e., ApplicationIntent
+		# 		MAYBE: .AlwaysEncrypted (various directives)
+		# 		MAYBE: ConnectionPoolingDirectives (loadbalancetimeout, maxpoolsize, minpoolsize)
+		# 		.MultiSubnetFailover  
+		# 		MAYBE: .PacketSize
 		
 		return $constructedString;
-		
-		# TODO: the train-wreck below - where I called into the FUNC that i was CALLING FROM and wondered why func i was originally calling into
-		# 	was asking for ... -Connection and -Batch ... needs to be addressed SOMEWHERE within the pipeline. 
-		
-		# TODO: 'cache' these connection details? ... ah yeah, easy enough: a hashtable of <connectionstring, true|false> (where true|false is whether it works or not.)
-#		$testResult = Test-ConnectionString -Framework $Framework -ConnectionString $constructedString;
-#		
-#		if ($null -eq $testResult) {
-#			return $constructedString;
-#		}
-#		
-#		throw "Connection Configuration Error: $testResult";
 	}
 }
-
-#function Test-ConnectionString {
-#	param (
-#		[ValidateSet("ODBC", "OLEDB", "SQLClient")]
-#		[string]$Framework = "ODBC",
-#		[Parameter(Mandatory)]
-#		[string]$ConnectionString
-#	);
-#	
-#	try {
-#		
-##		$conn = Get-ConnectionObject -Framework $Framework;
-#		$conn.ConnectionString = $ConnectionString;
-#		$conn.ConnectionTimeout = 20; # hmmmm. or ... should I pass this in from the callers?
-#		
-#		$cmd = Get-CommandObject -Framework $Framework;
-#		$cmd.Connection = $conn;
-#		$cmd.CommandText = "SELECT @@SERVERNAME [psi.command.connection-test]; ";
-#		$cmd.CommandType = "TEXT";
-#		
-#		$conn.Open();
-#		$cmd.ExecuteScalar() | Out-Null;
-#		$conn.Close();
-#		
-#		return $null;
-#	}
-#	catch {
-#		return $_;
-#	}
-#	
-#	# TODO: Need a FINALLY here to get rid of any objects I've created to this point. 
-#}

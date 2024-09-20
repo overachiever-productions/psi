@@ -12,6 +12,11 @@
 
         internal Parameter() { }
 
+        public void BindOutputParameter(object value)
+        {
+            this.Value = value;
+        }
+
         // TODO: maybe make VALUE, size, precision, and scope all NULLable instead of the -1 (and meh it might be null) approach I'm using now... 
         //      -1 is too ... magic-number-y.
         //      and/or just create different 'overloads' of the .ctor
@@ -70,6 +75,8 @@
             //      OR... I'm going to have to cheat and see if numeric/decimal exists in the string in question and .. if so ... replace the , inside the (,) ... with something else... 
             //      i.e., either I get a single regex that IGNOREs commas inside of () or ... i find all , inside of () + make sure they're part of decimal/numeric and ... 'replace' them to 
             //          then make things tons easier to parse/tackle 'down the road'.
+
+            // !!!! AH. decimal/numeric (or anything else that might have a , in the precision thingy) is going to have said comma WITHIN (parenthesis)
             if (serializedParameters.Contains("decimal") || serializedParameters.Contains("numeric"))
                 throw new NotImplementedException(
                     "Decimal and Numeric parameters are not yet supported - they gunk-up parsing logic (for now).");
@@ -145,7 +152,7 @@
                         case DataType.Binary:
                         case DataType.Varbinary:
                         case DataType.VarbinaryMax:
-                            throw new NotFiniteNumberException("not done yet");
+                            throw new NotImplementedException("not done yet");
                         // what I want here is ... p.Value = value.ToByteArray() or whatever would make sense here: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
                         // looks like this is it: https://stackoverflow.com/a/38140138/11191
                         //break;

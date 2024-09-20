@@ -22,7 +22,8 @@ public enum ResultType
     DataSet, 
     DataTable, 
     DataRow,
-    Scalar
+    Scalar, 
+    NonQuery
 }
 
 // Fodder: https://learn.microsoft.com/en-us/dotnet/api/system.data.sqldbtype?view=net-8.0
@@ -67,11 +68,12 @@ public enum DataType
     Sysname
 }
 
+[Flags]
 public enum ParameterDirection
 {
-    NotSet, 
-    Input,
-    InputOutput,
-    Output,
-    Return
+    NotSet = 0, 
+    Input = 1,
+    Output = 2,
+    InputOutput = 4,
+    Return = 8
 }

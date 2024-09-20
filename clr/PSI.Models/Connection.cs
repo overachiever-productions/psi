@@ -1,27 +1,5 @@
 ﻿namespace PSI.Models;
 
-// i.e., sqlclient, odbc, oledb... 
-// nice: 
-// https://learn.microsoft.com/en-us/dotnet/api/system.data.odbc.odbcconnectionstringbuilder?view=net-8.0
-// https://learn.microsoft.com/en-us/dotnet/api/system.data.oledb.oledbconnectionstringbuilder?view=net-8.0 
-// and, one thing that's SUPER clear: OLEDB and ODBC don't have NEAR the number of connection options that SqlClient does. 
-// specifically, they don't have EXPLICIT properties for: 
-//      ApplicationIntent (Ah, though they do have IsReadOnly)
-//      Connection retry logic (# of retries and times)
-//      TIMEOUT. wtf? 
-//      AlwaysEncrypted 'stuff' ... 
-//      Encrypt (i.e., .... TLS? + TrustServerCert)
-//      Connection Pooling directives (loadbalancetimeout, maxpoolsize, minpoolsize)
-//      MultiSubnetFailover. 
-//      PacketSize
-//                   
-// BUT, the different drivers (OLEDB and ODBC) DO provide connection-string details for 'all the options'
-// e.g., see this: 
-// https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15&viewFallbackFrom=sql-server-ver16 
-// and here's the anchor (same page as above) for OLEDB:
-// https://learn.microsoft.com/en-us/sql/relational-databases/native-client/applications/using-connection-string-keywords-with-sql-server-native-client?view=sql-server-ver15#ole-db-provider-connection-string-keywords
-// which means, I'm going to need something to abstract all of this 'stuff'
-
 public interface ICloneable<T>
 {
     T Clone();
@@ -73,7 +51,7 @@ public class Connection : ICloneable<Connection>
     private void AddCredential(PSCredential credential)
     {
         if (credential.UserName == "Psi_Bogus_C9F014B5-9C08-4C9D-B205-E3A7DFAB3C18")
-            return;  // this is a weird hack to avoid having to avoid branching logic within PowerShell funcs. 
+            return;  // Hack to avoid having to avoid branching logic within PowerShell funcs. 
 
         this.Credential = credential;
     }
@@ -100,7 +78,6 @@ public class Connection : ICloneable<Connection>
         // TODO: if there's existing ConnectionString info... then output.ConnString = this.ConnString
         // OR... whatever makes sense to 'copy out' ... 
         // etc. 
-
 
         return output;
     }

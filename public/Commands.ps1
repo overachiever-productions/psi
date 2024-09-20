@@ -2,11 +2,52 @@
 
 <#
 	
+	SUPER SIMPLE SPROC (no parameters):
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_meta_fields" -SqlCredential $creds;
 
-PICKUP/NEXT:
-- I want this to work: 
-Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_meta_fields" -SqlCredential (Get-Credential sa) -ConnectionTimeout 30;
+	SPROC with ONE input parameter (using simplified, inline, approach):
+				#TODO: not sure I love how i'm passing in VALUES for strings - i.e., PVCLeanData vs N'PVCleanData'. 
+				# 		it makes plenty of sense ... but I think that the 'other' (native-ish) way makes a lot of sense too. 
+				# i.e., might make sense to provide an option that STRIPS 'native' string handling  'back/down' to basics and go that route?
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_data_ranges" -ParameterString "@ImportType sysname = '; PRINT 'oh shit' --" -SqlCredential (Get-Credential sa);
 
+
+	PRINT / OUTPUT EXAMPLES: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential (Get-Credential sa);
+
+
+	EXCEPTION Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "RAISERROR(N'oink', 16, 1); " -SqlCredential (Get-Credential sa);
+
+	ROWCOUNT Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+#$global:VerbosePreference = "Continue";
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "DECLARE @x table (r int); INSERT INTO @x (r) VALUES (1), (2), (3);" -SqlCredential $creds;
+
+
+	OUTPUT PARAMETERs Example: 
+	NOTE: -AsNonQuery returns the OUTPUT parameters - whereas -AsObject returns an entire $results object... 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@InputValue" -Type "Sysname" -Value "SAMPLE_INPUT";
+		Add-PsiParameter -Name "@OutputA" -Type "Sysname" -Direction "Output";
+		Add-PsiParameter -Name "@OutputB" -Type "int" -Direction Output;
+		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Sproc "TestProc" -Parameters $parameters -SqlCredential $creds -AsObject;
+		write-host "@OutputA = [$($results[0].OutputParameters[0].Value)]; @OutputB = [$($results[0].OutputParameters[1].Value)]";
+
+
+	ERRORing Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+#$global:VerbosePreference = "Continue";
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "PRINT 'NICE';`r`nSELECT * FROM dbo.does_not_exist" -SqlCredential $creds;
 
 
 
@@ -50,7 +91,7 @@ END;
 "@
 
 
-	#$query = "SELECT * FROM dbo.Settings;";
+	$query = "SELECT * FROM dbo.Settings;";
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query $query -SqlCredential (Get-Credential sa) -ConnectionTimeout 30;
 
@@ -100,6 +141,8 @@ function Invoke-PsiCommand {
 		[Alias("Sproc", "ProcedureName", "Procedure")]
 		[string[]]$SprocName = $null,
 		[PSI.Models.ParameterSet[]]$Parameters = $null,
+		# TODO: can I create a DIFFERENT (PowerShell) ParameterSET that allows -Parameters to be a [String[]] instead of a Psi.Models.ParamSet[]?
+		# 		if so, that'd be much easier than remembering that there's a DIFF between parameters/paremeterString
 		[string[]]$ParameterString = $null,
 		[int]$ConnectionTimeout = -1,
 		[int]$CommandTimeout = -1,
@@ -112,7 +155,7 @@ function Invoke-PsiCommand {
 		[switch]$ReadOnly = $false,
 		[switch]$Encrypt = $true,
 		[switch]$TrustServerCert = $true,
-		# MAYBE: [switch]$MultiSubnetFailover = $false, ... this is ONLY supported for SqlClient. 
+		# MAYBE: [switch]$MultiSubnetFailover = $false,
 		[switch]$AsObject = $false,  # i.e., as a BatchResult (full/robust details and output)
 		[switch]$AsDataSet = $false,
 		[switch]$AsDataTable = $false,
@@ -128,7 +171,7 @@ function Invoke-PsiCommand {
 		[bool]$xDebug = ("Continue" -eq $global:DebugPreference) -or ($PSBoundParameters["Debug"] -eq $true);
 		
 		$outputOptions = @{
-			"Object"	= $AsObject
+			"PsiObject"	= $AsObject
 			"NonQuery"  = $AsNonQuery
 			"Scalar"    = $AsScalar
 			"Json"	  	= $AsJson
@@ -160,7 +203,7 @@ function Invoke-PsiCommand {
 		$commands = @();
 		$setsOfSetOptions = @();
 		$parameterSets = @();
-		
+			
 		# ====================================================================================================
 		# Connections:
 		# ====================================================================================================			
@@ -238,9 +281,9 @@ function Invoke-PsiCommand {
 		foreach ($pString in $ParameterString) {
 			$parameterSets += Expand-SerializedParameters -Parameters $pString;
 		}
-		
+			
 		if ($parameterSets.Count -lt 1) {
-			$Parameters += [Psi.Models.ParameterSet]::EmptyParameterSet();
+			$parameterSets += [Psi.Models.ParameterSet]::EmptyParameterSet();
 		}
 		
 		# ====================================================================================================
@@ -262,9 +305,8 @@ function Invoke-PsiCommand {
 				foreach ($credential in $SqlCredential) {
 					foreach ($db in $Database) {
 						foreach ($command in $commands) {
-							foreach ($paramSet in $Parameters) {
+							foreach ($paramSet in $parameterSets) {
 								foreach ($batch in $command.GetBatches()) {
-									
 									$connection.ConnectionTimeout = $ConnectionTimeout;
 									$connection.CommandTimeout = $CommandTimeout;
 									$connection.QueryTimeout = $QueryTimeout;
@@ -292,8 +334,8 @@ function Invoke-PsiCommand {
 		Add-ResultsToCommandHistory -Results $results;
 		
 		
-		Write-Host "-------------------------------------------------------------------------------------------------------------";
-		Write-Host "`n";
+#Write-Host "-------------------------------------------------------------------------------------------------------------";
+#Write-Host "`n";
 		
 		# TODO: 
 		# 		I've created problem for my self.  
@@ -338,9 +380,59 @@ function Invoke-PsiCommand {
 		
 		
 		# Processing of outputs is a BIT complex. But the best way to tackle that is to:
+		#  -2. If -AsObject... we're done
+		#  -1. If $results.Count -gt 1 ... return $results (i.e., same as -AsObject) UNLESS there's some sort of directive. 
+		# 	0. Check for any ERROR conditions or issues that would PREVENT normal, projected, output from being returned. 
+		# 	0.01 ... see IF there's even a DataTable ... (very similar to the above - but a number of legit operations WON'T have any kind of projection)
+		# 			at which point, look for (x) row(s) affected or ... errors, or return params or .. whatever? 
 		# 	1. Check for any EXPLICIT -AsXXX output types first (going 'up' from smallest/least output type to largest output type)
 		# 	2. Once those EXPLICIT options are handled, try going 'down' from largest to smallest to return whatever makes the most SENSE. 		
+		
+		if ($AsObject) {
+			return $results;
+		}
+		
+		if ($results.Count -gt 1) {
+			
+			# if -AsDataSet, or -AsDataTable or -AsXXx 
+			# 		then... for EACH of the results, extract the -AsXXX and return an ARRAY of those. 
+			
+			# which means ... i need a 'projection' FUNC where I pass in a $BatchResult object and ... 
+			# 		get back a -whatever... 
+			
+			# If NOT -AsXXX then... 
+			return $results; 
+		}
+		
+#	$emptyProjection = $false;
+#	if (($results.Count -eq 1) -and ($null -eq $results.DataSet)) {
+#		$emptyProjection = $true;
+#	}
+#	else {
+#		
+#	}
+		
+		if (($results.Count -eq 1) -and ($null -eq $results[0].DataSet)) {
+			
+			Write-Host "no dataset"
+			
+			if ($results[0].HasErrors) {
+				return $results[0].PrintedOutputs | Where-Object { $_.IsError };
+			}
+			
+		}
+		
+		# ====================================================================================================
+		# OLD / PREVIOUS (v0.2) Logic:
+		# ====================================================================================================			
 		if ($AsNonQuery) {
+			# IF someone executed (a single) -AsNonQuery with OUTPUT params, return THOSE. Otherwise, return ... nothing.
+			if (($results.Count -eq 1) -and ($results[0].OutputParameters.Count -gt 0)) {
+				return $results[0].OutputParameters;
+			}
+			
+			# TODO: MIGHT make sense to also look for 1x result and ... row-counts, or printed output, or ... errrors? 
+			
 			return;
 		}
 		
@@ -349,7 +441,7 @@ function Invoke-PsiCommand {
 		}
 		
 		# from here on out, need the DataSet...
-		$dataSet = $results.DataSet;
+		$dataSet = $results[0].DataSet;
 		
 		if ($AsScalar -or $AsJson -or $AsXml) {
 			return $dataSet.Tables[0].Rows[0][0];

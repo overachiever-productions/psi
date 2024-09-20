@@ -54,8 +54,6 @@ public class OptionSet
             //          SET CONTEXT_INFO 0x0BINARY... 
 
             // so... don't assume { ON | OFF } is the full subset of allowed values. 
-
-
         }
         catch
         {

@@ -28,8 +28,8 @@
 
 #>
 
-$global:PsiParameterManager = [PSI.Models.ParameterSetManager]::Instance;
 $global:PsiDefaultParameterSetName = "_DEFAULT";
+$global:PsiParameterManager = [PSI.Models.ParameterSetManager]::Instance;
 $global:PsiSizeableParameterTypes = @("char", "varchar", "Nchar", "Nvarchar", "binary", "varbinary", "datetime2");
 
 filter New-PsiParameterSet {
@@ -202,7 +202,6 @@ filter Bind-Parameters {
 		[PSI.Models.ParameterSet]$Parameters
 	);
 	
-	# Jackpot: These are the core docs I need: https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types
 	switch ($Framework) {
 		"System" {
 			foreach ($parameter in $Parameters.Parameters) {
@@ -211,6 +210,22 @@ filter Bind-Parameters {
 		}
 		default {
 			throw "System.Data.SqlClient is currently the ONLY supported -Provider.";
+		}
+	}
+}
+
+filter Bind-OutputParameterValues {
+	param (
+		[PSI.Models.BatchResult]$BatchResult,
+		$Command
+	);
+	
+	foreach ($outputParam in $BatchResult.OutputParameters) {
+		
+		$cmdParameter = $Command.Parameters | Where-Object { $_.ParameterName -eq $outputParam.Name };
+		
+		if ($cmdParameter) {
+			$outputParam.BindOutputParameter($cmdParameter.Value);
 		}
 	}
 }
@@ -239,62 +254,33 @@ filter Bind-SqlClientParameter {
 	[int]$precision = $null;
 	[int]$scale = $null;
 	
+	# https://learn.microsoft.com/en-us/dotnet/framework/data/adonet/configuring-parameters-and-parameter-data-types 
 	switch ($Parameter.DataType) {
-		"NotSet" {
-			throw "Psi Framwork Error.";
-		}
-		{
-			$_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float",
-				"Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier")
-		} {
+		{ $_ -in @("Bit", "TinyInt", "SmallInt", "Int", "BigInt", "SmallMoney", "Money", "Float", "Real", "Date", "Time", "SmallDateTime", "DateTime", "DateTimeOffset", "UniqueIdentifier") } {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 		}
-		{
-			$_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2")
-		} {
+		{ $_ -in @("Char", "Varchar", "NChar", "NVarchar", "Binary", "Varbinary", "DateTime2") } {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 			$size = $Parameter.Size;
 		}
-		{
-			$_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")
-		} {
+		{ $_ -in @("VarcharMax", "NVarcharMax", "VarbinaryMax")	} {
 			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
 			$size = -1;
 		}
-		{
-			$_ -in @("Decimal", "Numeric")
-		} {
+		{ $_ -in @("Decimal", "Numeric") } {
 			$type = [System.Data.SqlDbType]::Decimal;
 			$precision = $Parameter.Precision;
 			$scale = $Parameter.Scale;
 		}
-		"Image" {
-			$type = [System.Data.SqlDbType]::Image;
-		}
-		"Text" {
-			$type = [System.Data.SqlDbType]::Text;
-		}
-		"NText" {
-			$type = [System.Data.SqlDbType]::NText;
-		}
-		"SqlVariant" {
-			$type = [System.Data.SqlDbType]::Variant;
-		}
-		"Geometry" {
-			$type = [System.Data.SqlDbType]::Structured;
-		}
-		"Geography" {
-			$type = [System.Data.SqlDbType]::Structured;
-		}
-		"TimeStamp" {
-			$type = [System.Data.SqlDbType]::Timestamp;
-		}
-		"Xml" {
-			$type = [System.Data.SqlDbType]::Xml;
-		}
 		"Sysname" {
 			$type = [System.Data.SqlDbType]::NVarChar;
 			$size = 256;
+		}
+		{ $_ -in @("Image", "Text", "NText", "SqlVariant", "Geometry", "Geography", "TimeStamp", "Xml") } {
+			$type = [System.Data.SqlDbType]([Enum]::Parse([System.Data.SqlDbType], $Parameter.DataType, $true));
+		}
+		"NotSet" {
+			throw "Psi Framwork Error.";
 		}
 		default {
 			throw "not valid PsiType... no mapping could be made.";
@@ -308,7 +294,9 @@ filter Bind-SqlClientParameter {
 		$added.Value = $Parameter.Value;
 	}
 	else {
-		$added.Value = [System.DBNull];
+		if ($direction -notin @("Output", "Return")) {
+			$added.Value = [System.DBNull];
+		}
 	}
 	
 	if ($size) {
@@ -317,7 +305,7 @@ filter Bind-SqlClientParameter {
 	
 	if ($precision) {
 		$added.Precision = $precision;
-		$added.Scale = $scale;
+		$added.Scale = $scale; 
 	}
 	
 	$Command.Parameters.Add($added) | Out-Null;
@@ -329,6 +317,7 @@ filter ConvertTo-SystemParameterDirection {
 		[PSI.Models.ParameterDirection]$Direction
 	);
 	
+	# TODO: this is a LOT of code to allow for "Return" vs "ReturnValue" (i.e., that's the ONLY diff after removing OLEDB/ODBC)
 	switch ($Direction) {
 		"NotSet" {
 			throw "Psi Framework Error.";
