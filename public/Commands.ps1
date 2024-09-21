@@ -49,6 +49,19 @@
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "PRINT 'NICE';`r`nSELECT * FROM dbo.does_not_exist" -SqlCredential $creds;
 
+	# NOTE: I created the test below cuz I was debugging an issue with ... not being able to pass in bit / boolean params. 
+	BIT (Boolean) Sproc Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@TrueOrFalse" -Type "bit" -Value $true;
+		Add-PsiParameter -Name "@OutValue" -Type "bit" -Direction Output;
+		$results = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database meddling -Sproc "BitTesting" -Parameters $parameters -SqlCredential $creds -AsObject;
+		write-host "@OutValue = $($results[0].OutputParameters[0].Value)";
+
+
+
+
 
 
 					#$query = Get-Content "D:\Dropbox\Desktop\.junk\psi_script_test.sql" -Raw;

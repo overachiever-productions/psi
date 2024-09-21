@@ -290,7 +290,9 @@ filter Bind-SqlClientParameter {
 	$added = New-Object System.Data.SqlClient.SqlParameter($Parameter.Name, $type);
 	$added.Direction = $direction;
 	
-	if ($Parameter.Value) {
+	
+	# WARNING: NEED to check data-type for BITs here - otherwise if($Parameter.Value) can equate to if($false) (when Bit value = $false)
+	if (("Bit" -eq $Parameter.DataType) -or ($Parameter.Value)) {
 		$added.Value = $Parameter.Value;
 	}
 	else {
