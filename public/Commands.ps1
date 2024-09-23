@@ -22,7 +22,10 @@
 
 	EXCEPTION Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "RAISERROR(N'oink', 16, 1); " -SqlCredential (Get-Credential sa);
+#$global:VerbosePreference = "Continue";
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "RAISERROR(N'oink', 16, 1); " -SqlCredential $creds;
+
 
 	ROWCOUNT Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
@@ -30,8 +33,16 @@
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "DECLARE @x table (r int); INSERT INTO @x (r) VALUES (1), (2), (3);" -SqlCredential $creds;
 
+	BIT Sproc (input and OUTPUT) Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@TrueOrFalse" -Type "bit" -Value $true;
+		Add-PsiParameter -Name "@OutValue" -Type "bit" -Direction Output;
+		$results = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database meddling -Sproc "BitTesting" -Parameters $parameters -SqlCredential $creds -AsObject;
+		write-host "@OutValue = $($results[0].OutputParameters[0].Value)";
 
-	OUTPUT PARAMETERs Example: 
+	Slightly more Complicated OUTPUT PARAMETERs Example: 
 	NOTE: -AsNonQuery returns the OUTPUT parameters - whereas -AsObject returns an entire $results object... 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
@@ -49,44 +60,13 @@
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "PRINT 'NICE';`r`nSELECT * FROM dbo.does_not_exist" -SqlCredential $creds;
 
-	# NOTE: I created the test below cuz I was debugging an issue with ... not being able to pass in bit / boolean params. 
-	BIT (Boolean) Sproc Example: 
+
+	PIPELINE/MULTI-PLEXED Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
-		$parameters = New-PsiParameterSet;
-		Add-PsiParameter -Name "@TrueOrFalse" -Type "bit" -Value $true;
-		Add-PsiParameter -Name "@OutValue" -Type "bit" -Direction Output;
-		$results = Invoke-PsiCommand -SqlInstance dev.sqlserver.id -Database meddling -Sproc "BitTesting" -Parameters $parameters -SqlCredential $creds -AsObject;
-		write-host "@OutValue = $($results[0].OutputParameters[0].Value)";
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id", "sql-150-02.sqlserver.id" -Database "master", "admindb" -Query $query, "SELECT TOP (10) Tables ORDER BY Size DESC;" -SqlCredential $creds;
+	
 
-
-
-
-
-
-					#$query = Get-Content "D:\Dropbox\Desktop\.junk\psi_script_test.sql" -Raw;
-
-
-					#$query = @"
-					#USE [admindb];   /* multi line comment here - to make sure that multi-line comments
-					#can
-					#and will
-					#be ignored */
-					#GO
-					#
-					#IF OBJECT_ID(N'abc', N'U') IS NULL BEGIN 
-					#    CREATE TABLE abc (id int);
-					#END; 
-					#GO
-					#
-					#USE [admindb];  -- comment here - just for fun. 
-					#GO 
-					#
-					#IF OBJECT_ID(N'xyz', N'U') IS NULL BEGIN 
-					#    CREATE TABLE xyz (id int);
-					#END;
-					#GO
-					#"@;
 
 
 					#$query = Get-Content "D:\Dropbox\Repositories\S4\Common\Tables\restore_log.sql" -Raw;
@@ -104,7 +84,7 @@ END;
 "@
 
 
-	$query = "SELECT * FROM dbo.Settings;";
+	#$query = "SELECT * FROM dbo.Settings;";
 	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 	Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query $query -SqlCredential (Get-Credential sa) -ConnectionTimeout 30;
 
@@ -117,13 +97,6 @@ END;
 
 
 
-	#Invoke-PsiCommand -SqlInstance "dev.sqlserver.id", "sql-150a.sqlserver.id" -Database "master", "admindb" -Query $query, "SELECT TOP (10) Tables ORDER BY Size DESC;"
-	
-
-#Invoke-PsiCommand  -ConnectionString "first" -Query "SELECT TOP 200 session_id FROM sys.dm_exec_sessions;" -AsJson;
-
-# should throw:
-	#Invoke-PsiCommand -SqlInstance "dev.sqlserver.id"  -ConnectionString "first" -Query "SELECT TOP 200 session_id FROM sys.dm_exec_sessions;"
 
 
 #>
@@ -346,11 +319,7 @@ function Invoke-PsiCommand {
 	end {
 		Add-ResultsToCommandHistory -Results $results;
 		
-		
-#Write-Host "-------------------------------------------------------------------------------------------------------------";
-#Write-Host "`n";
-		
-		# TODO: 
+		<# TODO: 
 		# 		I've created problem for my self.  
 		# 		$results is NOW a COLLECTION of 1 - N outputs/results. 
 		# 				that wasn't, initially the case. 
@@ -390,7 +359,7 @@ function Invoke-PsiCommand {
 		# 				> otherwise, can/will spit out tables ... i guess to a point. 
 		# 					or, maybe a description of a table in some cases. 
 		# 					e.g., 3 tables with 12, 4, 6 columns and 128, 3, 333387 rows (respectively)
-		
+		#>
 		
 		# Processing of outputs is a BIT complex. But the best way to tackle that is to:
 		#  -2. If -AsObject... we're done
@@ -406,33 +375,46 @@ function Invoke-PsiCommand {
 		}
 		
 		if ($results.Count -gt 1) {
+			Write-Verbose "More than 1x Result was Returned.";
+			# TODO: need a FUNC for each -AsXXXX so that, if/when there are > 1 result and -AsXXXX is set, 
+			# 		I can return an ARRAY of XXXX 
 			
-			# if -AsDataSet, or -AsDataTable or -AsXXx 
-			# 		then... for EACH of the results, extract the -AsXXX and return an ARRAY of those. 
-			
-			# which means ... i need a 'projection' FUNC where I pass in a $BatchResult object and ... 
-			# 		get back a -whatever... 
-			
-			# If NOT -AsXXX then... 
+			# If NOT -AsXXXX then... 
 			return $results; 
 		}
 		
-#	$emptyProjection = $false;
-#	if (($results.Count -eq 1) -and ($null -eq $results.DataSet)) {
-#		$emptyProjection = $true;
-#	}
-#	else {
-#		
-#	}
+		$emptyProjection = $false;
+		if ($results.Count -eq 1) {
+			if ($null -eq $results[0].DataSet) {
+				$emptyProjection = $true;
+			}
+			else {
+				if ($results[0].DataSet.Tables.Count -eq 0) {
+					$emptyProjection = $true;
+				}
+			}
+		}
 		
-		if (($results.Count -eq 1) -and ($null -eq $results[0].DataSet)) {
+		if ($emptyProjection) {
+			$firstResult = $results[0];
+			Write-Verbose "Single Result - No PROJECTION.";
 			
-			Write-Host "no dataset"
-			
-			if ($results[0].HasErrors) {
-				return $results[0].PrintedOutputs | Where-Object { $_.IsError };
+			if ($firstResult.HasErrors) {
+				Write-Verbose "	Single Result - ERRORs.";
+ 				return $firstResult.Errors;
 			}
 			
+			if ($firstResult.OutputParameters.Count -gt 0) {
+				return $firstResult.OutputParameters;
+			}
+			
+			if ($firstResult.RowCounts.Count -gt 0) {
+				$rowCounts = @();
+				foreach ($count in $firstResult.RowCounts) {
+					$rowCounts += $count.Item1;
+				}
+				return $rowCounts;
+			}
 		}
 		
 		# ====================================================================================================

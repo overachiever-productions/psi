@@ -1,4 +1,6 @@
-﻿namespace PSI.Models;
+﻿using System.Runtime.CompilerServices;
+
+namespace PSI.Models;
 
 public class Batch
 {
@@ -42,53 +44,25 @@ public class BatchResult
         }
     }
 
-    /*
-    
-         TODO: other objects like: 
-           .Parameters - i.e., inputs. 
-           . Connection info? i.e., might as well BIND that to this object (i.e., the 'batch') as it'll be part of the output, right?
-               specifically, i want server and ... username (windows or sql).
-           .Return Params
-           .Projection / Output
-           .Printed Text or whatever...
-           .Full-on errors. 
-           .start/end .ExecutionTime
-           .etc. 
-           .TargetDatabases - which'll be ... lazy-loaded via a func against the original batch thingy? (if so, then I have to pass that in).
-                     so, yeah, maybe just have the .TargetDatabases (List<string>) prop... be implemented here (lazy-loaded) and ... NOT in the 'parser'.
+    public string TargetServer { get; private set; }
+    public string TargetDatabase { get; private set; } 
 
-    FROM POWERSHELL (i.e., other crap I had down as potential ideas of .properties to 'shove' in here:
-		# NOTE ... $batchResult is where I'm going to bind things like the connection-details
-       # 			such as ... 
-       #					.server, .user, etc.   (conn Properties)
-       # 				.parameters (including outputs) (parameters)
-       # 				. SetOptions ... 
-       # 				.dataset 
-       # 				.printed (collection of strings/printed outputs... )
-       # 				.result-type
-       
-       
-       # OTHER THINGS to bundle (i.e.., early/previous notes):
-       # 	new CommandThingy - with following Props: 
-       # 		.ConnectionString 
-       # 		. 	Database (or is that part of the above - think it's both ... i.e., want to know which DB we connected against for history - but conn-string needs to be done/complete)
-       # 		. 	Server (yeah, same as above)
-       # 		. 	Framework (ditto - needs to be part of connstring - but also want to track it)
-       # 		. 	AppName (ditto)
-       # 		. 	Command - but this'll be per each GO-d block... 
-       # 		. 	Command-type 
-       # 		. 	Encrypt/Read-Only (AG)/TrustServer - i.e., these are all details. 
-       # 		. 	SET options and other conn-string details. (like arithabort, ansi_nulls, etc)
-       # 	so... use a .Connection object - with all of the props above - and ... .GetConnectionString() as a serialization func (that can't be leaked/output)
-       # 		.ResultType (as x, y, or z - but only 1 option)
-       # 		.Timeouts
-       # 		. 	Connection (this'll have to be copied to .Connection object)
-       # 		. 	Command  which is either a sproc name or a Batch/ParsedBatch... 
-       # 		.  
+    // TODO: Pull these from ... ParsedBatch.
+    //public List<String> UsedDatabases { get; private set; } // fulfills the above
+    public string Login { get; private set; }
+    public string ApplicationName { get; private set; }
 
+    public OptionSet Options { get; private set; }
 
-     
-     */
+    public int ConnectionTimeout { get; private set; }
+    public int CommandTimeout { get; private set; }
+    public int QueryTimeout { get; private set; }
+
+    // TODO: 
+    // Connection OPTIONS: MultiSubnet, Encrypt, TrustServerCert, AppIntent (readonly), etc... 
+
+    public DateTime? ExecutionStart { get; private set; }
+    public DateTime? ExecutionEnd { get; private set; }
 
     public bool HasErrors
     {
@@ -98,11 +72,27 @@ public class BatchResult
         }
     }
 
+    public List<Error> Errors
+    {
+        get
+        {
+            List<Error> output = new List<Error>();
+
+            if (this.HasErrors)
+            {
+                foreach (var printedOutput in this.PrintedOutputs.Where(x => x.IsError))
+                    output.Add(printedOutput.ToError());
+            }
+
+            return output;
+        }
+    }
+
     public string BatchText { get; private set; }
 
     public ParsedBatch ParsedBatch { get; private set; }
 
-    protected BatchResult(Batch batch, ParameterSet parameters)
+    protected BatchResult(Batch batch, Connection connection, ParameterSet parameters, OptionSet options)
     {
         this.CommandType = batch.CommandType;
         this.ResultType = batch.ResultType;
@@ -116,11 +106,22 @@ public class BatchResult
             this.BatchText = batch.BatchText;
 
         this.Parameters = parameters.Parameters;
+
+        this.TargetServer = connection.Server;
+        this.TargetDatabase = connection.Database;
+        this.Login = connection.Credential.UserName;
+        this.ApplicationName = connection.ApplicationName;
+
+        this.ConnectionTimeout = connection.ConnectionTimeout;
+        this.CommandTimeout = connection.CommandTimeout;
+        this.QueryTimeout = connection.QueryTimeout;
+
+        this.Options = options;
     }
 
-    public static BatchResult FromBatch(Batch batch, ParameterSet parameters)
+    public static BatchResult FromBatch(Batch batch, Connection connection, ParameterSet parameters, OptionSet options)
     {
-        return new BatchResult(batch, parameters);
+        return new BatchResult(batch, connection, parameters, options);
     }
 
     public void AddPrintedOutput(PrintedOutput printedOutput)
@@ -137,6 +138,16 @@ public class BatchResult
     {
         if (this.AllowRowCounts)
             this.RowCounts.Add(new Tuple<string, DateTime>(modified, timestamp));
+    }
+
+    public void SetBatchExecutionStart()
+    {
+        this.ExecutionStart = DateTime.Now;
+    }
+
+    public void SetBatchExecutionEnd()
+    {
+        this.ExecutionEnd = DateTime.Now;
     }
 }
 
@@ -155,4 +166,18 @@ public class PrintedOutput(string message, int severity, int state, int errorNum
             return Severity > 11;
         }
     }
+
+    public Error ToError()
+    {
+        return new Error(this.Message, this.Severity, this.State, this.ErrorNumber, this.LineNumber);
+    }
+}
+
+public class Error(string message, int severity, int state, int errorNumber, int lineNumber)
+{
+    public string Message { get; private set; } = message;
+    public int Severity { get; private set; } = severity;
+    public int State { get; private set; } = state;
+    public int ErrorNumber { get; private set; } = errorNumber;
+    public int LineNumber { get; private set; } = lineNumber;
 }

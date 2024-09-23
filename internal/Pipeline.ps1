@@ -1,14 +1,5 @@
 ﻿Set-StrictMode -Version 3.0;
 
-<#
-	
-	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-
-
-# $results += Execute-Batch -Framework $Framework -Batch $batch -Connection $batchConnection -Parameters $paramSet;
-
-#>
-
 function Execute-Batch {
 	[CmdletBinding()]
 	param (
@@ -24,8 +15,7 @@ function Execute-Batch {
 	);
 	
 	begin {
-		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Parameters);
-		# TODO: bind other 'outputs' to  $batchResult 
+		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Connection, $Parameters, $SetOptions);
 	}
 	
 	process {
@@ -47,13 +37,12 @@ function Execute-Batch {
 			$adapter = Get-DataAdapter $Framework -Command $cmd;
 		}
 		catch {
-			#throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
-			throw $_;
+			throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
 		}
-		
-		# TODO: ... there's no 'finally' here that cleans up objects ... 
+		# TODO: ... there's no 'finally' here that cleans up objects ... i.e., in case of ERRORs. 
 		
 		try {
+			$batchResult.SetBatchExecutionStart();
 			$conn.Open();
 			
 			# TODO: If -AsNonQuery ... then DON'T wire up an adapter ... and just run as $cmd.ExecuteNonQuery();
@@ -81,7 +70,7 @@ function Execute-Batch {
 		}
 		finally {
 			$conn.Close();
-			
+			$batchResult.SetBatchExecutionEnd();
 			# and... I should be doing .Dispose here too, right - on $conn, $cmd, and ... $adapter - i.e., check to see if ALL of them are present, open, etc. and ... do the WHOLE 9 yards in terms of cleanup. 
 		}
 	}
