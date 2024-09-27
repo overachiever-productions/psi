@@ -1,7 +1,7 @@
 ﻿@{
 	
 	RootModule = 'psi.psm1'
-	ModuleVersion = '0.3.4'
+	ModuleVersion = '0.3.5'
 	GUID = '0ef30001-2e21-469e-95bc-50261ea2f8e6'
 	Author = 'Michael K. Campbell'
 	CompanyName = 'OverAchiever Productions, LLC.'
