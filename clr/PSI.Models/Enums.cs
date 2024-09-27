@@ -17,6 +17,7 @@ public enum ResultType
 {
     NotSet, 
     PsiObject, 
+    MessagesOnly,
     Xml, 
     Json, 
     DataSet, 

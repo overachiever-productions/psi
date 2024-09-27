@@ -67,6 +67,14 @@
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id", "sql-150-02.sqlserver.id" -Database "master", "admindb" -Query $query, "SELECT TOP (10) Tables ORDER BY Size DESC;" -SqlCredential $creds;
 	
 
+	PIPELINE / FILES Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$files = Get-ChildItem -Path "D:\Dropbox\Repositories\dda\tests\capture" -Filter "*.sql";
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "dda_test" -File $files -SqlCredential $creds -MessagesOnly;
+
+
+
 
 
 					#$query = Get-Content "D:\Dropbox\Repositories\S4\Common\Tables\restore_log.sql" -Raw;
@@ -110,6 +118,8 @@ function Get-PsiConnectionString {
 	
 }
 
+# Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-PsiSql... (i quite like Invoke-PsiCmd )
+
 function Invoke-PsiCommand {
 	[CmdletBinding()]
 	param (
@@ -143,6 +153,7 @@ function Invoke-PsiCommand {
 		[switch]$TrustServerCert = $true,
 		# MAYBE: [switch]$MultiSubnetFailover = $false,
 		[switch]$AsObject = $false,  # i.e., as a BatchResult (full/robust details and output)
+		[switch]$MessagesOnly = $false,  # i.e., just "messages" tab types of output... 
 		[switch]$AsDataSet = $false,
 		[switch]$AsDataTable = $false,
 		[switch]$AsDataRow = $false,
@@ -157,14 +168,15 @@ function Invoke-PsiCommand {
 		[bool]$xDebug = ("Continue" -eq $global:DebugPreference) -or ($PSBoundParameters["Debug"] -eq $true);
 		
 		$outputOptions = @{
-			"PsiObject"	= $AsObject
-			"NonQuery"  = $AsNonQuery
-			"Scalar"    = $AsScalar
-			"Json"	  	= $AsJson
-			"Xml"	    = $AsXml
-			"DataRow"   = $AsDataRow
-			"DataTable" = $AsDataTable
-			"DataSet"   = $AsDataSet
+			"PsiObject" 	= $AsObject
+			"MessagesOnly" 	= $MessagesOnly
+			"NonQuery"  	= $AsNonQuery
+			"Scalar"    	= $AsScalar
+			"Json"	  		= $AsJson
+			"Xml"	    	= $AsXml
+			"DataRow"   	= $AsDataRow
+			"DataTable" 	= $AsDataTable
+			"DataSet"   	= $AsDataSet
 		}
 		
 		if(($outputOptions.GetEnumerator() | Where-Object { $true -eq $_.Value; } | Measure-Object).Count -gt 1) {
@@ -285,7 +297,7 @@ function Invoke-PsiCommand {
 		# ====================================================================================================
 		# Combine Options:
 		# ====================================================================================================	
-		[int]$batchNumber = 0;
+		[int]$batchNumber = 1;
 		foreach ($connection in $connections) {
 			foreach ($optionsSet in $setsOfSetOptions) {
 				foreach ($credential in $SqlCredential) {
@@ -372,6 +384,15 @@ function Invoke-PsiCommand {
 		
 		if ($AsObject) {
 			return $results;
+		}
+		
+		if ($MessagesOnly) {
+			$messages = @();
+			foreach ($r in $results) {
+				$messages += $r.Messages;
+			}
+			
+			return $messages;
 		}
 		
 		if ($results.Count -gt 1) {

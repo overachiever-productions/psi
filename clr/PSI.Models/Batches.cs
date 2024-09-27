@@ -33,6 +33,7 @@ public class BatchResult
     public List<Tuple<string, DateTime>> RowCounts { get; private set; } = new List<Tuple<string, DateTime>>();
     public List<PrintedOutput> PrintedOutputs { get; private set; } = new List<PrintedOutput>();
     public List<Parameter> Parameters { get; private set; }
+    public List<string> Messages { get; private set; } = new List<string>();
     // NOTE: The projection (3rd "P") - if there is one - is dynamically 'bolted on to' the BatchResult from within PowerShell. 
 
     public List<Parameter> OutputParameters
@@ -61,6 +62,7 @@ public class BatchResult
     // TODO: 
     // Connection OPTIONS: MultiSubnet, Encrypt, TrustServerCert, AppIntent (readonly), etc... 
 
+    public int BatchNumber { get; private set; }
     public DateTime? ExecutionStart { get; private set; }
     public DateTime? ExecutionEnd { get; private set; }
 
@@ -92,7 +94,7 @@ public class BatchResult
 
     public ParsedBatch ParsedBatch { get; private set; }
 
-    protected BatchResult(Batch batch, Connection connection, ParameterSet parameters, OptionSet options)
+    protected BatchResult(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber)
     {
         this.CommandType = batch.CommandType;
         this.ResultType = batch.ResultType;
@@ -111,6 +113,7 @@ public class BatchResult
         this.TargetDatabase = connection.Database;
         this.Login = connection.Credential.UserName;
         this.ApplicationName = connection.ApplicationName;
+        this.BatchNumber = batchNumber;
 
         this.ConnectionTimeout = connection.ConnectionTimeout;
         this.CommandTimeout = connection.CommandTimeout;
@@ -119,14 +122,15 @@ public class BatchResult
         this.Options = options;
     }
 
-    public static BatchResult FromBatch(Batch batch, Connection connection, ParameterSet parameters, OptionSet options)
+    public static BatchResult FromBatch(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber)
     {
-        return new BatchResult(batch, connection, parameters, options);
+        return new BatchResult(batch, connection, parameters, options, batchNumber);
     }
 
     public void AddPrintedOutput(PrintedOutput printedOutput)
     {
         this.PrintedOutputs.Add(printedOutput);
+        this.Messages.Add($"Msg {printedOutput.ErrorNumber}, Level {printedOutput.Severity}, State {printedOutput.State}, Line {printedOutput.LineNumber}\r\n{printedOutput.Message}");
     }
 
     public void EnableRowCounts()
@@ -137,7 +141,11 @@ public class BatchResult
     public void AddRowCount(string modified, DateTime timestamp)
     {
         if (this.AllowRowCounts)
+        {
             this.RowCounts.Add(new Tuple<string, DateTime>(modified, timestamp));
+
+            this.Messages.Add(modified);
+        }
     }
 
     public void SetBatchExecutionStart()
@@ -148,6 +156,11 @@ public class BatchResult
     public void SetBatchExecutionEnd()
     {
         this.ExecutionEnd = DateTime.Now;
+
+        if (this.Messages.Count == 0)
+            // this mimics behavior of SSMS - which throws this text out IF there were no row-updates and no errors:
+            this.Messages.Add("Commands completed successfully.");
+
     }
 }
 

@@ -15,7 +15,7 @@ function Execute-Batch {
 	);
 	
 	begin {
-		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Connection, $Parameters, $SetOptions);
+		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Connection, $Parameters, $SetOptions, $BatchNumber);
 	}
 	
 	process {
@@ -64,6 +64,7 @@ function Execute-Batch {
 			}
 			
 			$conn.Close();
+			
 		}
 		catch {
 			throw "EXECUTION ERROR: $_ "; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
