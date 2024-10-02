@@ -186,6 +186,7 @@ public class PrintedOutput(string message, int severity, int state, int errorNum
     }
 }
 
+// TODO: should probably shove this into its own .cs file... 
 public class Error(string message, int severity, int state, int errorNumber, int lineNumber)
 {
     public string Message { get; private set; } = message;
@@ -193,4 +194,13 @@ public class Error(string message, int severity, int state, int errorNumber, int
     public int State { get; private set; } = state;
     public int ErrorNumber { get; private set; } = errorNumber;
     public int LineNumber { get; private set; } = lineNumber;
+
+    public string Summarize()
+    {
+        throw new NotImplementedException();
+        // but... i should return this the exact same way (formatting) that it gets throw out/by SSMS... 
+        // e.g., 
+        //  <error #>, state, etc, line, #
+        //  error message here. 
+    }
 }

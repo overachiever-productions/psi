@@ -418,10 +418,10 @@ function Invoke-PsiCommand {
 		
 		if ($emptyProjection) {
 			$firstResult = $results[0];
-			Write-Verbose "Single Result - No PROJECTION.";
+			Write-Debug "Single Result - No PROJECTION.";
 			
 			if ($firstResult.HasErrors) {
-				Write-Verbose "	Single Result - ERRORs.";
+				Write-Debug "	Single Result - ERRORs.";
  				return $firstResult.Errors;
 			}
 			
