@@ -22,7 +22,7 @@
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		$myDbName = "admindb";
 		$id = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "Select [database_id] FROM sys.databases WHERE [name] = @myDbName;" `
-			-ParameterString "@myDbNaIme sysname = $myDbName" -SqlCredential $creds;
+			-ParameterString "@myDbName sysname = $myDbName" -SqlCredential $creds;
 		$id;
 
 	SUPER SIMPLE SPROC (no parameters):
@@ -35,10 +35,11 @@
 				# 		it makes plenty of sense ... but I think that the 'other' (native-ish) way makes a lot of sense too. 
 				# i.e., might make sense to provide an option that STRIPS 'native' string handling  'back/down' to basics and go that route?
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_data_ranges" -ParameterString "@ImportType sysname = '; PRINT 'oh shit' --" -SqlCredential (Get-Credential sa);
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_data_ranges" -ParameterString "@ImportType sysname = '; PRINT 'oh crap!' --" -SqlCredential (Get-Credential sa);
 
 
 	PRINT / OUTPUT EXAMPLES: 
+# 0.3.7 Busted: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential (Get-Credential sa);
 
@@ -75,6 +76,22 @@
 		Add-PsiParameter -Name "@OutputB" -Type "int" -Direction Output;
 		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Sproc "TestProc" -Parameters $parameters -SqlCredential $creds -AsObject;
 		write-host "@OutputA = [$($results[0].OutputParameters[0].Value)]; @OutputB = [$($results[0].OutputParameters[1].Value)]";
+
+
+	NATIVE FOR XML as the OUTPUT: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));		
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@ProjectNumber" -Type "nvarchar" -Size 12 -Value "PV24.2682";
+		Add-PsiParameter -Name "@Errors" -Type "xml" -Direction "Output";
+		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "[dbo].[validate_staged_equipment]" -Parameters $parameters -SqlCredential $creds -AsObject;
+		$xmlData = $results[0].OutputParameters[0].Value;
+		if("" -eq $xmlData){
+			Write-Host "No Problems";
+		}
+		else {
+			$xmlData | ConvertTo-Xml;
+		}
 
 
 	ERRORing Example: 
@@ -158,8 +175,8 @@ function Invoke-PsiCommand {
 		[string[]]$SqlInstance,
 		[string[]]$ConnectionString,
 		[Alias("Credential", "Credentials")]
-		[string[]]$SetOptions = $null,
 		[PSCredential[]]$SqlCredential,
+		[string[]]$SetOptions = $null,
 		[string[]]$Database = "master",
 		[Alias("Command", "CommandText")]
 		[string[]]$Query = $null,
