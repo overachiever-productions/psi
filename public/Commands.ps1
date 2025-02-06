@@ -2,6 +2,29 @@
 
 <#
 	
+	SUPER SIMPLE QUERY Example: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$id = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "Select [database_id] FROM sys.databases WHERE [name] = 'admindb';" -SqlCredential $creds;
+		$id;
+
+	SIMPLE QUERY WITH PARAMS:
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@myDbName" -Type "sysname" -Value "admindb";
+		$id = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "Select [database_id] FROM sys.databases WHERE [name] = @myDbName;" `
+			-Parameters $parameters -SqlCredential $creds;
+		$id;
+
+	SIMPLE QUERY WITH PARAMS-STRING
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$myDbName = "admindb";
+		$id = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "Select [database_id] FROM sys.databases WHERE [name] = @myDbName;" `
+			-ParameterString "@myDbName sysname = $myDbName" -SqlCredential $creds;
+		$id;
+
 	SUPER SIMPLE SPROC (no parameters):
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
@@ -12,10 +35,11 @@
 				# 		it makes plenty of sense ... but I think that the 'other' (native-ish) way makes a lot of sense too. 
 				# i.e., might make sense to provide an option that STRIPS 'native' string handling  'back/down' to basics and go that route?
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_data_ranges" -ParameterString "@ImportType sysname = '; PRINT 'oh shit' --" -SqlCredential (Get-Credential sa);
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "load_import_data_ranges" -ParameterString "@ImportType sysname = '; PRINT 'oh crap!' --" -SqlCredential (Get-Credential sa);
 
 
 	PRINT / OUTPUT EXAMPLES: 
+# 0.3.7 Busted: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential (Get-Credential sa);
 
@@ -52,6 +76,22 @@
 		Add-PsiParameter -Name "@OutputB" -Type "int" -Direction Output;
 		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Sproc "TestProc" -Parameters $parameters -SqlCredential $creds -AsObject;
 		write-host "@OutputA = [$($results[0].OutputParameters[0].Value)]; @OutputB = [$($results[0].OutputParameters[1].Value)]";
+
+
+	NATIVE FOR XML as the OUTPUT: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));		
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@ProjectNumber" -Type "nvarchar" -Size 12 -Value "PV24.2682";
+		Add-PsiParameter -Name "@Errors" -Type "xml" -Direction "Output";
+		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "lifingdb" -Sproc "[dbo].[validate_staged_equipment]" -Parameters $parameters -SqlCredential $creds -AsObject;
+		$xmlData = $results[0].OutputParameters[0].Value;
+		if("" -eq $xmlData){
+			Write-Host "No Problems";
+		}
+		else {
+			$xmlData | ConvertTo-Xml;
+		}
 
 
 	ERRORing Example: 
@@ -105,6 +145,14 @@ END;
 
 
 
+Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+[PSCredential]$creds;
+
+Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @@SERVERNAME [server_name];" -SqlCredential $creds;
+
+
+
+
 
 
 #>
@@ -127,8 +175,8 @@ function Invoke-PsiCommand {
 		[string[]]$SqlInstance,
 		[string[]]$ConnectionString,
 		[Alias("Credential", "Credentials")]
+		[PSCredential[]]$SqlCredential,
 		[string[]]$SetOptions = $null,
-		[PSCredential]$SqlCredential,
 		[string[]]$Database = "master",
 		[Alias("Command", "CommandText")]
 		[string[]]$Query = $null,
@@ -158,7 +206,7 @@ function Invoke-PsiCommand {
 		[switch]$AsDataTable = $false,
 		[switch]$AsDataRow = $false,
 		[switch]$AsScalar = $false,
-		[switch]$AsNonQuery = $false,
+		[switch]$AsNonQuery = $false,  # see notes on (roughly) line #483 - about combining -AsObject and -AsNonQuery into 'same thing'
 		[switch]$AsJson = $false,
 		[switch]$AsXml = $false
 	);
@@ -201,6 +249,7 @@ function Invoke-PsiCommand {
 		$commands = @();
 		$setsOfSetOptions = @();
 		$parameterSets = @();
+		$credentialSets = @();
 			
 		# ====================================================================================================
 		# Connections:
@@ -287,11 +336,14 @@ function Invoke-PsiCommand {
 		# ====================================================================================================
 		# Credentials:
 		# ====================================================================================================			
+		foreach ($credSet in $SqlCredential) {
+			$credentialSets += $credSet
+		}
 		# IF NO Creds supplied, we'll assume Native/Windows Auth - i.e., current user. BUT, still need a 'creds'
 		# 	place-holder object to iterate through/over in the nested loops part of assembling batches/commands: 
 		if (-not (Array-IsPopulated $SqlCredential)) {
 			# REFACTOR: have the following, bogus, cred created by a FACTORY (static .ctor) method... (and move the "notes" above into said method...)
-			$SqlCredential += [PSCredential]::new("Psi_Bogus_C9F014B5-9C08-4C9D-B205-E3A7DFAB3C18", ("_PLACEHOLDER_" | ConvertTo-SecureString -AsPlainText -Force ));
+			$credentialSets += [PSCredential]::new("Psi_Bogus_C9F014B5-9C08-4C9D-B205-E3A7DFAB3C18", ("_PLACEHOLDER_" | ConvertTo-SecureString -AsPlainText -Force ));
 		}
 		
 		# ====================================================================================================
@@ -300,7 +352,7 @@ function Invoke-PsiCommand {
 		[int]$batchNumber = 1;
 		foreach ($connection in $connections) {
 			foreach ($optionsSet in $setsOfSetOptions) {
-				foreach ($credential in $SqlCredential) {
+				foreach ($credential in $credentialSets) {
 					foreach ($db in $Database) {
 						foreach ($command in $commands) {
 							foreach ($paramSet in $parameterSets) {
@@ -316,6 +368,7 @@ function Invoke-PsiCommand {
 									$connection.ApplicationName = $ApplicationName;
 									
 									$batchConnection = $connection.GetBatchConnection($credential, $db);
+									
 									$results += Execute-Batch -Framework $Framework -Connection $batchConnection -Batch $batch -SetOptions $optionsSet -Parameters $paramSet -BatchNumber $batchNumber;
 									
 									$batchNumber += 1;
@@ -418,10 +471,10 @@ function Invoke-PsiCommand {
 		
 		if ($emptyProjection) {
 			$firstResult = $results[0];
-			Write-Verbose "Single Result - No PROJECTION.";
+			Write-Debug "Single Result - No PROJECTION.";
 			
 			if ($firstResult.HasErrors) {
-				Write-Verbose "	Single Result - ERRORs.";
+				Write-Debug "	Single Result - ERRORs.";
  				return $firstResult.Errors;
 			}
 			
@@ -440,7 +493,10 @@ function Invoke-PsiCommand {
 		
 		# ====================================================================================================
 		# OLD / PREVIOUS (v0.2) Logic:
-		# ====================================================================================================			
+		# ====================================================================================================		
+# TODO: I should probably evaluate making -AsQuery an ALIAS for -AsObject ... 
+#   because... the current implementation of -AsQuery ... returns an object that does NOT have a .HasErrors property or ... anything else 'needed';
+# 		arguably, someone could always 'get at' those values via Get-PsiHistory (or whatever it ends up being called), but ... hmmm.
 		if ($AsNonQuery) {
 			# IF someone executed (a single) -AsNonQuery with OUTPUT params, return THOSE. Otherwise, return ... nothing.
 			if (($results.Count -eq 1) -and ($results[0].OutputParameters.Count -gt 0)) {

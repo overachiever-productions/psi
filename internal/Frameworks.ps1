@@ -61,27 +61,45 @@ function Get-ConnectionObject {
 			throw "CONN SETUP ERROR: $_";
 		}
 		
-		try {
-			$cmd = Get-CommandObject -Framework $Framework;
-			$cmd.Connection = $output;
-			$cmd.CommandText = "SELECT @@SERVERNAME [psi.command.connection-test]; ";
-			$cmd.CommandType = "TEXT";
-			
-			$output.Open() | Out-Null -WarningAction SilentlyContinue;
-			$cmd.ExecuteScalar() | Out-Null;
-			$output.Close();
-			
-		}
-		catch {
-			throw "xCONN TEST ERROR: $_";
-		}
-		finally {
-			# anything I should be cleaning up here ? 	(i.e., "can't" dispose the connection - it's ... what I'm passing out. 
-			# but... command, and other things should be getting nuked, right? 
-		}
+		Test-DbConnection -ConnectionString $connString;
 		
 		return $output;
 	}
+}
+
+$global:5EAF20FD_TestedConnections = @{ };
+filter Test-DbConnection {
+	param (
+		[string]$ConnectionString
+	);
+	
+	$lastTested = $global:5EAF20FD_TestedConnections[$ConnectionString];
+	if ($lastTested) {
+		if ($lastTested -gt [Datetime]::Now.AddMinutes(-30)) {
+			return;
+		}
+	}
+	
+	try {
+		$cmd = Get-CommandObject -Framework $Framework;
+		$cmd.Connection = $output;
+		$cmd.CommandText = "SELECT @@SERVERNAME [psi.command.connection-test]; ";
+		$cmd.CommandType = "TEXT";
+		
+		$output.Open() | Out-Null -WarningAction SilentlyContinue;
+		$cmd.ExecuteScalar() | Out-Null;
+		$output.Close();
+		
+	}
+	catch {
+		throw;
+	}
+	finally {
+		# TODO: anything I should be cleaning up here ? 	(i.e., "can't" dispose the connection - it's ... what I'm passing out. 
+		# but... command, and other things should be getting nuked, right? 
+	}
+	
+	$global:5EAF20FD_TestedConnections[$ConnectionString] = [DateTime]::Now;
 }
 
 function Get-CommandObject {

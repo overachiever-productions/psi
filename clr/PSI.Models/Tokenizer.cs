@@ -345,6 +345,8 @@ public class Tokenizer(string rawText) : ITokenizer
             int end = go.EndIndex - previousStart - go.Text.Length;
 
             string batchText = this.RawText.Substring(previousStart, end).Trim();
+            if(string.IsNullOrWhiteSpace(batchText) || batchText == go.Text)
+                continue;
 
             var sources = new TextSources(this.RawText, this.RawText.Substring(previousStart, (end + go.Text.Length)));
             var batch = new ParsedBatch(previousStart, go.EndIndex, batchText, sources);
@@ -357,10 +359,12 @@ public class Tokenizer(string rawText) : ITokenizer
         if (previousStart < this.RawText.Length)
         {
             var batchText = this.RawText.Substring(previousStart, this.RawText.Length - previousStart).Trim();
-
-            var sources = new TextSources(this.RawText, this.RawText.Substring(previousStart, this.RawText.Length - previousStart));
-            var batch = new ParsedBatch(previousStart, this.RawText.Length, batchText, sources);
-            output.Add(batch);
+            if (!string.IsNullOrWhiteSpace(batchText))
+            {
+                var sources = new TextSources(this.RawText, this.RawText.Substring(previousStart, this.RawText.Length - previousStart));
+                var batch = new ParsedBatch(previousStart, this.RawText.Length, batchText, sources);
+                output.Add(batch);
+            }
         }
 
         if (ignoreGoInUseOnlyBatches)
@@ -369,8 +373,10 @@ public class Tokenizer(string rawText) : ITokenizer
             previousStart = 0;
             var sourceText = this.RawText;
 
+            int currentBatch = 0;
             foreach (var batch in output)
             {
+                currentBatch++;
                 var text = batch.BatchText;
 
                 int goLength = 0;
@@ -393,11 +399,14 @@ public class Tokenizer(string rawText) : ITokenizer
                             sourceText = sourceText.ReplaceAtIndex(batch.GoStatement.StartIndex, ' ');
                             sourceText = sourceText.ReplaceAtIndex(batch.GoStatement.StartIndex + 1, ' ');
 
-                            // NOTE: there's an edge case where "USE xxx\r\nGO" are the LAST lines in a script. And, if so, the "GO" will end
-                            // up being removed AND we'll get a final/terminating batch of "USE xxx" - with nothing else. That's ... fine at 
-                            // this point. But may be something where I want to 'collapse' that final batch 'up into' the previous batch. 
-                            // if so: a) if batchNumber (i.e., here, right now) == output.Count - 1. b) create a new batch with END offsets = batch.BatchText.Length
-                            //      and c) make sure that applies to the batch-text as well... then, d) pop/remove last ParsedBatch from modifiedBatches and replace with ... newly created.
+                            // There's an EDGE case where a 'batch' might terminate with a USE xxxx; ... and have NOTHING after it. 
+                            //      that's ... useless, but, need to account for it (which the code below does):
+                            if (currentBatch == output.Count)
+                            {
+                                var tailBatch = new ParsedBatch(previousStart, batch.EndIndex, batch.BatchText, batch.TextSources);
+                                modifiedBatches.Add(tailBatch);
+                            }
+
                             continue;
                         }
                     }

@@ -15,7 +15,12 @@ function Execute-Batch {
 	);
 	
 	begin {
-		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Connection, $Parameters, $SetOptions, $BatchNumber);
+		$currentUserName = $env:USERNAME;
+		if ((Get-CimInstance Win32_ComputerSystem).Domain -ne "WORKGROUP") {
+				$currentUserName = "$($env:USERDOMAIN )\$($currentUserName)";
+		}
+		
+		$batchResult = [PSI.Models.BatchResult]::FromBatch($Batch, $Connection, $Parameters, $SetOptions, $BatchNumber, $currentUserName);
 	}
 	
 	process {

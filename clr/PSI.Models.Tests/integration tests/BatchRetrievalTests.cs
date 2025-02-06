@@ -207,7 +207,8 @@ public class BatchRetrievalTests
     [Test]
     public void GetTokenizedBatches_Does_Not_Lose_UseXxx_Go_At_Script_End()
     {
-        var sut = new Tokenizer("USE [master];\r\nGO\r\nSELECT @@SERVERNAME;\r\nGO\r\nUSE [admindb];\r\nGO\r\n");
+        var text = "USE [master];\r\nGO\r\nSELECT @@SERVERNAME;\r\nGO\r\nUSE [admindb];\r\nGO\r\n";
+        var sut = new Tokenizer(text);
         sut.Initialize();
         sut.Tokenize();
 
@@ -216,5 +217,28 @@ public class BatchRetrievalTests
 
         StringAssert.AreEqualIgnoringCase("USE [master];\r\n  \r\nSELECT @@SERVERNAME;", batches[0].BatchText);
         StringAssert.AreEqualIgnoringCase("USE [admindb];", batches[1].BatchText); // technically a 'useless' batch ... but, it was a useless command too... 
+
+        // sanity check (on offsets)
+        Assert.That(batches[0].StartIndex, Is.EqualTo(0));
+        Assert.That(batches[0].EndIndex, Is.EqualTo(41));
+        StringAssert.AreEqualIgnoringCase(text.Substring(0, 41).Replace("GO", "  "), "USE [master];\r\n  \r\nSELECT @@SERVERNAME;\r\n");
+
+        Assert.That(batches[1].StartIndex, Is.EqualTo(43));
+        Assert.That(batches[1].EndIndex, Is.EqualTo(63));
+
+        // TODO: this is technically a bit off... i.e., i THINK this should start at ... USE instead of \r\n
+        StringAssert.AreEqualIgnoringCase(text.Substring(43, 63 - 43).Replace("GO", "  "), "\r\nUSE [admindb];\r\n  ");
+    }
+
+    [Test]
+    public void GetTokenizedBatches_Removes_Blank_Batches()
+    {
+        // actual lines from tSQLt.database.sql - i.e., 2x 'bogus' GO statements. 
+        var sut = new Tokenizer("DECLARE @Msg NVARCHAR(MAX);SELECT @Msg = 'Installed at '+CONVERT(NVARCHAR,GETDATE(),121);RAISERROR(@Msg,0,1);\r\nGO\r\n\r\n\r\nGO\r\n\r\n\r\n\r\nGO\r\n\r\nIF EXISTS (SELECT 1 FROM sys.assemblies WHERE name = 'tSQLtCLR')\r\n    DROP ASSEMBLY tSQLtCLR;\r\nGO");
+        sut.Initialize();
+        sut.Tokenize();
+
+        var batches = sut.GetParsedBatches(true);
+        Assert.That(batches.Count, Is.EqualTo(2));
     }
 }

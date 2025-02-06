@@ -94,7 +94,7 @@ public class BatchResult
 
     public ParsedBatch ParsedBatch { get; private set; }
 
-    protected BatchResult(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber)
+    protected BatchResult(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber, string userName)
     {
         this.CommandType = batch.CommandType;
         this.ResultType = batch.ResultType;
@@ -111,7 +111,11 @@ public class BatchResult
 
         this.TargetServer = connection.Server;
         this.TargetDatabase = connection.Database;
-        this.Login = connection.Credential.UserName;
+
+        if (connection.Credential == null)
+            this.Login = userName;
+        else 
+            this.Login = connection.Credential.UserName;
         this.ApplicationName = connection.ApplicationName;
         this.BatchNumber = batchNumber;
 
@@ -122,9 +126,9 @@ public class BatchResult
         this.Options = options;
     }
 
-    public static BatchResult FromBatch(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber)
+    public static BatchResult FromBatch(Batch batch, Connection connection, ParameterSet parameters, OptionSet options, int batchNumber, string userName)
     {
-        return new BatchResult(batch, connection, parameters, options, batchNumber);
+        return new BatchResult(batch, connection, parameters, options, batchNumber, userName);
     }
 
     public void AddPrintedOutput(PrintedOutput printedOutput)
@@ -186,6 +190,7 @@ public class PrintedOutput(string message, int severity, int state, int errorNum
     }
 }
 
+// TODO: should probably shove this into its own .cs file... 
 public class Error(string message, int severity, int state, int errorNumber, int lineNumber)
 {
     public string Message { get; private set; } = message;
@@ -193,4 +198,9 @@ public class Error(string message, int severity, int state, int errorNumber, int
     public int State { get; private set; } = state;
     public int ErrorNumber { get; private set; } = errorNumber;
     public int LineNumber { get; private set; } = lineNumber;
+
+    public string Summarize()
+    {
+        return $"Msg {this.ErrorNumber}, Level {this.Severity}, State {this.State}, Line {this.LineNumber}\r\n{this.Message}";
+    }
 }

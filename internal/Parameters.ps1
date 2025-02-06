@@ -28,6 +28,12 @@
 
 #>
 
+# TODO
+# REFACTOR 
+# 	all of the <verb>-Psi<Noun> funcs need to be moved to public. 
+# 	and... I'm curious about whether exporting FILTERS within the "FunctionsToExport" part of a module manifest... 
+# 			even works. I'm PRETTY SURE IT DOES NOT. 
+
 $global:PsiDefaultParameterSetName = "_DEFAULT";
 $global:PsiParameterManager = [PSI.Models.ParameterSetManager]::Instance;
 $global:PsiSizeableParameterTypes = @("char", "varchar", "Nchar", "Nvarchar", "binary", "varbinary", "datetime2");
