@@ -41,7 +41,8 @@
 	PRINT / OUTPUT EXAMPLES: 
 # 0.3.7 Busted: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential (Get-Credential sa);
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential $creds;
 
 
 	EXCEPTION Example: 
@@ -77,6 +78,17 @@
 		$results = Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Sproc "TestProc" -Parameters $parameters -SqlCredential $creds -AsObject;
 		write-host "@OutputA = [$($results[0].OutputParameters[0].Value)]; @OutputB = [$($results[0].OutputParameters[1].Value)]";
 
+	SPROC WITH MULTIPLE PARAMS, no projections, and MULTIPLE text outputs:
+
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+
+		$parameters = New-PsiParameterSet;
+		Add-PsiParameter -Name "@BackupType" -Type sysname -Value "FULL";
+		Add-PsiParameter -Name "@DatabasesToBackup" -Type Nvarchar -Size 1000 -Value "{SYSTEM}";
+		Add-PsiParameter -Name "@BackupRetention" -Type Nvarchar -Size 10 -Value "120 hours";
+		
+		Invoke-PsiCommand -SqlInstance "sql-160-04.sqlserver.id" -SqlCredential $creds -Database admindb -Sproc 'dbo.backup_databases' -Parameters $parameters;
 
 	NATIVE FOR XML as the OUTPUT: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
@@ -533,33 +545,40 @@ function Invoke-PsiCommand {
 			return $dataSet;
 		}
 		
-		$table = $dataSet.Tables[0];
-		if ($table.Rows.Count -gt 1) {
-			return $table;
+		if ($dataSet.Tables.Count -gt 0) {
+			$table = $dataSet.Tables[0];
+			if ($table.Rows.Count -gt 1) {
+				return $table;
+			}
+			
+			if ($table.Rows.Count -eq 0) {
+				return; # this is/was an 'implicit' -AsNonQuery
+			}
+			
+			# there was ONLY 1 row (from a single table):
+			$row = $table.Rows[0];
+			
+			# NOTE: Can't 'tell' how many columns per ROW - have to 'query' for this info against the parent table instead. 
+			# 		otherwise, if we've got a table with 1 row and just 1 column, we've hit an implicit scalar:
+			if ($table.Columns.Count -gt 1) {
+				return $row;
+			}
+			#		
+			#		if ($row.Columns.Count -gt 1) {
+			#			return $row; # multiple columns - return the entire row.
+			#		}
+			
+			# There are 3x options for returning scalar values:
+			# 		a. Return the WHOLE ROW (even if it's just a single column-wide). This is what Invoke-SqlCmd does. 
+			# 		b. Create a custom PSObject with column-name and value results. CAN'T see ANY benefit to this over a data-row.
+			# 		c. No context info - just the scalar result itself (i.e., not the column-name - just the 'scalar value itself - fully isolated')/
+			# For now, Invoke-PsiCommand will leverage option A. 
+			return $row; # option C would be $row[0].
 		}
-		
-		if ($table.Rows.Count -eq 0) {
-			return; # this is/was an 'implicit' -AsNonQuery
+		else {
+			# if there were no tables... were there any 'printed' outputs? 
+			
+			Write-Host 'printed stuff would go here';
 		}
-		
-		# there was ONLY 1 row (from a single table):
-		$row = $table.Rows[0];
-		
-		# NOTE: Can't 'tell' how many columns per ROW - have to 'query' for this info against the parent table instead. 
-		# 		otherwise, if we've got a table with 1 row and just 1 column, we've hit an implicit scalar:
-		if ($table.Columns.Count -gt 1){
-			return $row; 
-		}
-#		
-#		if ($row.Columns.Count -gt 1) {
-#			return $row; # multiple columns - return the entire row.
-#		}
-		
-		# There are 3x options for returning scalar values:
-		# 		a. Return the WHOLE ROW (even if it's just a single column-wide). This is what Invoke-SqlCmd does. 
-		# 		b. Create a custom PSObject with column-name and value results. CAN'T see ANY benefit to this over a data-row.
-		# 		c. No context info - just the scalar result itself (i.e., not the column-name - just the 'scalar value itself - fully isolated')/
-		# For now, Invoke-PsiCommand will leverage option A. 
-		return $row; # option C would be $row[0].		
 	}
 }
