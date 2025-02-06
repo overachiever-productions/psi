@@ -39,10 +39,17 @@
 
 
 	PRINT / OUTPUT EXAMPLES: 
-# 0.3.7 Busted: 
-		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
-		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential $creds;
+		
+		IMPLIED PRINT:
+			Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+			$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+			Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "PRINT 'this is printed'" -SqlCredential $creds;
+
+		EXPLICIT PRINT: 
+			TODO ... implement this. 
+			AND call out how it has a much more 'complex' set of outputs. 
+				Probably, also, need to create a method or whatever on .Messages to 
+				Get summary or whatever. 
 
 
 	EXCEPTION Example: 
@@ -576,9 +583,28 @@ function Invoke-PsiCommand {
 			return $row; # option C would be $row[0].
 		}
 		else {
-			# if there were no tables... were there any 'printed' outputs? 
-			
-			Write-Host 'printed stuff would go here';
+			# If there were no PROJECTIONS, attempt to return JUST messages. 
+			# 	however, unlike EXPLICIT messages, just want to return STRINGS only... 
+			foreach ($r in $results) {
+				$messages = @();
+				foreach ($r in $results) {
+					$messages += $r.Messages;
+				}
+				
+				if ($null -ne $messages) {
+					$strings = @();
+					foreach ($m in $messages) {
+						foreach ($s in $m.Split([Environment]::NewLine)) {
+							if ($s -like 'Msg 0*' -or $s -like '*Level 0*' -or $s -like '*Level 1*') {
+								continue;
+							}
+							$strings += $s;
+						}
+					}
+					
+					return $strings;
+				}
+			}
 		}
 	}
 }
