@@ -92,7 +92,7 @@ filter Test-DbConnection {
 		
 	}
 	catch {
-		throw "xCONN TEST ERROR: $_";
+		throw;
 	}
 	finally {
 		# TODO: anything I should be cleaning up here ? 	(i.e., "can't" dispose the connection - it's ... what I'm passing out. 
