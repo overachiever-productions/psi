@@ -60,11 +60,69 @@ public class SerializedParameterTests
         StringAssert.AreEqualIgnoringCase("'this is ascii text vs unicode'", sut.Parameters[2].Value.ToString());
     }
 
-    // next: 
-    //  @ within 'strings' is ignored (Doesn't split into a different spot). 
-    //  strings can be ESCAPED - e.g., @p3 sysname = 'that''s what I said!' - should be fine. 
-    //  strings can be nested - e.g., @p3 sysname = 'this is ''tricky'' and stuff' - should be fine. 
+    [Test]
+    public void Parameter_String_Allows_Escaped_Ticks_In_String_Value()
+    {
+        var serialized = "@p2 sysname = 'that''s what I said!', @p12 varchar(50) = 'this is ascii text vs unicode'";
+        var sut = ParameterSet.ParameterSetFromSerializedInput(serialized, "_DEFAULT");
+
+        Assert.That(sut.Parameters.Count, Is.EqualTo(2));
+
+        StringAssert.AreEqualIgnoringCase("'that''s what I said!'", sut.Parameters[0].Value.ToString());
+    }
+
+    [Test]
+    public void Parameter_String_Allows_Nested_Ticks_In_String_Value()
+    {
+        var serialized = "@p1 int = 12, @p2 sysname = 'this is ''tricky'' and stuff', @p12 varchar(50) = 'this is ascii text vs unicode'";
+        var sut = ParameterSet.ParameterSetFromSerializedInput(serialized, "_DEFAULT");
+
+        Assert.That(sut.Parameters.Count, Is.EqualTo(3));
+
+        StringAssert.AreEqualIgnoringCase("'this is ''tricky'' and stuff'", sut.Parameters[1].Value.ToString());
+    }
+
+    [Test]
+    public void Parameter_String_Ignores_At_Sign_Within_Strings()
+    {
+        var serialized = "@UserId int = 10088, @EmailAddress sysname = 'mike@angrypets.com'";
+        var sut = ParameterSet.ParameterSetFromSerializedInput(serialized, "_DEFAULT");
+
+        Assert.That(sut.Parameters.Count, Is.EqualTo(2));
+
+        StringAssert.AreEqualIgnoringCase("'mike@angrypets.com'", sut.Parameters[1].Value.ToString());
+    }
+
+    [Test]
+    public void Parameter_String_Ignores_Apostrophe_In_Email_Address()
+    {
+        var serialized = "@UserId int = 10088, @EmailAddress sysname = 'mike.o''mally@angrypets.com'";
+        var sut = ParameterSet.ParameterSetFromSerializedInput(serialized, "_DEFAULT");
+
+        Assert.That(sut.Parameters.Count, Is.EqualTo(2));
+
+        StringAssert.AreEqualIgnoringCase("'mike.o''mally@angrypets.com'", sut.Parameters[1].Value.ToString());
+    }
+
+    [Test]
+    public void Parameter_String_Ignores_Padded_White_Space()
+    {
+        var serialized = " @UserId   int   =   10088,   @EmailAddress   sysname   =   'mike@angrypets.com'  ";
+        var sut = ParameterSet.ParameterSetFromSerializedInput(serialized, "_DEFAULT");
+
+        Assert.That(sut.Parameters.Count, Is.EqualTo(2));
+
+        Assert.That(sut.Parameters[0].Name, Is.EqualTo("@UserId"));
+        Assert.That(sut.Parameters[0].DataType, Is.EqualTo(DataType.Int));
+        Assert.That(sut.Parameters[0].Value, Is.EqualTo(10088));
+
+        Assert.That(sut.Parameters[1].Name, Is.EqualTo("@EmailAddress"));
+        Assert.That(sut.Parameters[1].DataType, Is.EqualTo(DataType.Sysname));
+        Assert.That(sut.Parameters[1].Value, Is.EqualTo("'mike@angrypets.com'"));
+    }
 
     // OUTPUTs i.e., make sure I can detect OUTPUT and INPUT/OUTPUT. 
     // RETURN. Make sure I can detect/map RETURN params.
+
+    // NULLs and/or no assigned values. 
 }

@@ -246,24 +246,45 @@ namespace PSI.Models
             bool firstAtSignHit = false;
             bool inString = false;
             int stringNestingDepth = 0;
+            int nestIgnore = -1;
 
             using StringReader sr = new StringReader(serialized); 
             while((currentValue = sr.Read()) != -1)
             {
                 char current = (char)currentValue;
+                char nextChar = (currentIndex + 1 < serialized.Length) ? char.Parse(serialized.Substring(currentIndex + 1, 1)) : '\0';
 
-                if (current == '\'')
+                if (current == 39)
                 {
                     if (stringNestingDepth == 0)
                     {
                         if (!inString)
-                        {
-
-                        }
+                            inString = true;
                         else
                         {
-                            inString = false;
-                            //continue;
+                            if (39 == nextChar)
+                            {
+                                stringNestingDepth++;
+                                nestIgnore = currentIndex + 1;
+                            }
+                            else
+                                inString = false;
+                        }
+                    }
+                    else
+                    {
+                        if (currentIndex == nestIgnore)
+                            nestIgnore = -1;
+                        else
+                        {
+                            if (39 == nextChar)
+                                nestIgnore = currentIndex + 1;
+                            else
+                            {
+                                stringNestingDepth--;
+                                if(stringNestingDepth == 0)
+                                    inString = false;
+                            }
                         }
                     }
                 }
@@ -281,6 +302,7 @@ namespace PSI.Models
                         {
                             output.Add(serialized.Substring(lastStart, currentIndex - lastStart).Trim().Trim(','));
                             lastStart = currentIndex;
+                            inString = false;
                         }
                     }
                 }
