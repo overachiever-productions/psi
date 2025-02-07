@@ -1,4 +1,6 @@
-﻿namespace PSI.Models
+﻿using System.Runtime.CompilerServices;
+
+namespace PSI.Models
 {
     public class Parameter
     {
@@ -67,35 +69,25 @@
         {
             ParameterSet output = new ParameterSet(setName);
 
-            // TODO ... validate that the string isn't null/empty... and that it meets 'basic' requirements
-            //  or, maybe just wrap everything in try catch? 
+            if (string.IsNullOrWhiteSpace(serializedParameters))
+                return output;
 
-            // TODO: splitting on "," won't work if there's a decimal/numeric in the mix... cuz ... that'll be @something decimal(8,2) or whatever..
-            //      so, I'm going to have to find a solid REGEX that accounts for this. 
-            //      OR... I'm going to have to cheat and see if numeric/decimal exists in the string in question and .. if so ... replace the , inside the (,) ... with something else... 
-            //      i.e., either I get a single regex that IGNOREs commas inside of () or ... i find all , inside of () + make sure they're part of decimal/numeric and ... 'replace' them to 
-            //          then make things tons easier to parse/tackle 'down the road'.
+            // Scenarios to Account For:
+            //      - @myDecimal decimal(12,2) = 87.8 
+            //      - @myParam sysname = 'this string has a , in it' ... 
+            //      - @myFloat float = 99,3  ... i.e., some europeans/etc. use , instead of . as a 'decimal' point. 
+            //      - @EmailAddy sysname = N'mike@overachiever.net' ... has the @ inside... 
 
-            // !!!! AH. decimal/numeric (or anything else that might have a , in the precision thingy) is going to have said comma WITHIN (parenthesis)
-            if (serializedParameters.Contains("decimal") || serializedParameters.Contains("numeric"))
-                throw new NotImplementedException(
-                    "Decimal and Numeric parameters are not yet supported - they gunk-up parsing logic (for now).");
-
-            string[] parameters = serializedParameters.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            foreach (string parameter in parameters)
+            foreach (string parameter in SplitSerializedParameters(serializedParameters))
             {
-                bool isOutput = parameter.Trim().Contains(" OUTPUT");
-
-                // NOTE: removing OUTPUT AND splitting here: 
+                bool isOutput = parameter.Contains(" OUTPUT");
                 string[] parts = parameter.Replace(" OUTPUT", "").Split('=', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
                 if (parts.Length > 2)
-                    throw new InvalidOperationException("too many parts");
+                    throw new InvalidOperationException("Serialized Parameter has too many parts/components.");
 
                 Parameter p = new Parameter();
 
                 string declaration = parts[0];
-                // TODO: this regex needs some help... 
                 Regex r = new Regex(@"(?<name>.+\s)(?<dataType>.+)");
                 Match m = r.Match(declaration);
 
@@ -107,7 +99,7 @@
                     string sizing = null;
                     if (type.Contains("("))
                     {
-                        sizing = type.Substring(type.IndexOf("("), type.Length);
+                        sizing = type.Substring(type.IndexOf("("), type.Length - type.IndexOf("("));
                         type = type.Replace(sizing, "");
                     }
 
@@ -127,6 +119,10 @@
 
                         p.Size = int.Parse(sizing);
                     }
+                }
+                else
+                {
+                    throw new InvalidOperationException("Serialized Parameter Is NOT in correct format.");
                 }
 
                 string value = null;
@@ -239,6 +235,65 @@
             {
                 return this.ParameterSetName == BOGUS_SET_NAME;
             }
+        }
+
+        private static List<string> SplitSerializedParameters(string serialized)
+        {
+            List<string> output = new List<string>();
+            int currentValue;
+            int currentIndex = 0;
+            int lastStart = 0;
+            bool firstAtSignHit = false;
+            bool inString = false;
+            int stringNestingDepth = 0;
+
+            using StringReader sr = new StringReader(serialized); 
+            while((currentValue = sr.Read()) != -1)
+            {
+                char current = (char)currentValue;
+
+                if (current == '\'')
+                {
+                    if (stringNestingDepth == 0)
+                    {
+                        if (!inString)
+                        {
+
+                        }
+                        else
+                        {
+                            inString = false;
+                            //continue;
+                        }
+                    }
+                }
+
+                if (current == '@')
+                {
+                    if (!firstAtSignHit)
+                    {
+                        firstAtSignHit = true;
+                        lastStart = currentIndex;
+                    }
+                    else
+                    {
+                        if (!inString)
+                        {
+                            output.Add(serialized.Substring(lastStart, currentIndex - lastStart).Trim().Trim(','));
+                            lastStart = currentIndex;
+                        }
+                    }
+                }
+
+                currentIndex++;
+            }
+
+            if (currentIndex == serialized.Length)
+            {
+                output.Add(serialized.Substring(lastStart, currentIndex - lastStart).Trim().Trim(','));
+            }
+
+            return output;
         }
     }
 
