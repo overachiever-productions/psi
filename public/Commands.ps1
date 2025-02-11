@@ -61,7 +61,7 @@
 
 	ROWCOUNT Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-#$global:VerbosePreference = "Continue";
+		#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "DECLARE @x table (r int); INSERT INTO @x (r) VALUES (1), (2), (3);" -SqlCredential $creds;
 
