@@ -42,7 +42,7 @@ function Execute-Batch {
 			$adapter = Get-DataAdapter $Framework -Command $cmd;
 		}
 		catch {
-			throw "SETUP ERROR: $_ => $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
+			throw "CONNECTION ERROR: $_ `r`n`t=> $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
 		}
 		# TODO: ... there's no 'finally' here that cleans up objects ... i.e., in case of ERRORs. 
 		
@@ -72,7 +72,7 @@ function Execute-Batch {
 			
 		}
 		catch {
-			throw "EXECUTION ERROR: $_ "; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
+			throw "EXECUTION ERROR: $_ `r`n`t=> $($_.Exception.StackTrace)"; # TODO: https://overachieverllc.atlassian.net/browse/PSI-15
 		}
 		finally {
 			$conn.Close();

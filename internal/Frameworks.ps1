@@ -82,14 +82,13 @@ filter Test-DbConnection {
 	
 	try {
 		$cmd = Get-CommandObject -Framework $Framework;
-		$cmd.Connection = $output;
+		$cmd.Connection = $output;		# TODO: Don't like how I'm using child-scope here ... just seems wrong (in fact, it's NOT by design and I wonder HOW I managed this.)
 		$cmd.CommandText = "SELECT @@SERVERNAME [psi.command.connection-test]; ";
 		$cmd.CommandType = "TEXT";
 		
 		$output.Open() | Out-Null -WarningAction SilentlyContinue;
 		$cmd.ExecuteScalar() | Out-Null;
 		$output.Close();
-		
 	}
 	catch {
 		throw;
