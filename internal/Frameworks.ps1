@@ -81,7 +81,9 @@ filter Test-DbConnection {
 	}
 	
 	try {
-		$cmd = Get-CommandObject -Framework $Framework;
+		# TODO: Ugh. This used to get a command via Get-CommandObject. Only, that caused SUCH a ridiculous amount of confusion when debugging/etc. that ... it was criminal.
+		# 		For NOW, it's hard-coded. But will NEED to be able to address the kind of object to create (System.Data or Microsoft.Data) based on $Framework - in the future. 
+		$cmd = New-Object System.Data.SqlClient.SqlCommand; 		
 		$cmd.Connection = $output;		# TODO: Don't like how I'm using child-scope here ... just seems wrong (in fact, it's NOT by design and I wonder HOW I managed this.)
 		$cmd.CommandText = "SELECT @@SERVERNAME [psi.command.connection-test]; ";
 		$cmd.CommandType = "TEXT";
@@ -105,6 +107,7 @@ function Get-CommandObject {
 	param (
 		[ValidateSet("System", "Microsoft")]
 		[string]$Framework = "System",
+		#[Parameter(Mandatory)]
 		[PSI.Models.BatchResult]$BatchResult
 	);
 	
@@ -133,6 +136,12 @@ function Get-CommandObject {
 				}
 				
 				$output.Add_StatementCompleted($handler);
+				
+				if ($BatchResult.CommandTimeout -ne -1) {
+					$output.CommandTimeout = $BatchResult.CommandTimeout;
+					Write-Debug "`t`tExplicit Command.CommandTimeout Set -> ($($BatchResult.CommandTimeout) seconds).";
+				}
+				
 				return $output;
 			}
 			default{
