@@ -25,12 +25,19 @@
 			-ParameterString "@myDbName sysname = $myDbName" -SqlCredential $creds;
 		$id;
 
+	PARAMS-STRING - WITH SYSNAME data-type: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @myParam [output];" `
+			-ParameterString "@myParam sysname = 'some sort of object name or whatever'" -SqlCredential $creds;
+
 
 	PARAMS-STRING - with VARIABLE LENGTH DATA TYPEs: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @myParam [output];" `
 			-ParameterString "@myParam varchar(12) = 'hard coded'" -SqlCredential $creds;
+
 
 	PARAMS-STRING WITH NULL INPUTs: 
 
