@@ -65,14 +65,12 @@
 
 	EXCEPTION Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "RAISERROR(N'oink', 16, 1); " -SqlCredential $creds;
 
 
 	ROWCOUNT Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "DECLARE @x table (r int); INSERT INTO @x (r) VALUES (1), (2), (3);" -SqlCredential $creds;
 
@@ -123,10 +121,20 @@
 			$xmlData | ConvertTo-Xml;
 		}
 
+	COMMAND TIMEOUT EXAMPLES: 
+
+		# Hit a Timeout:
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "WAITFOR DELAY '00:00:35'; SELECT 1 [output];" -SqlCredential $creds;
+
+		# Set a CommandTimeout (and avoid operation timing out):
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "WAITFOR DELAY '00:00:35'; SELECT 1 [output];" -SqlCredential $creds -CommandTimeout 40;
 
 	ERRORing Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "PRINT 'NICE';`r`nSELECT * FROM dbo.does_not_exist" -SqlCredential $creds;
 
@@ -187,9 +195,6 @@ Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 [PSCredential]$creds;
 
 Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @@SERVERNAME [server_name];" -SqlCredential $creds;
-
-
-
 
 
 
