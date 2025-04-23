@@ -133,10 +133,18 @@
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "dda_test" -File $files -SqlCredential $creds -MessagesOnly;
 
 
+	TEST of S4: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		$file = "D:\Dropbox\Repositories\S4\Deployment\admindb_latest.sql";
+		Invoke-PsiCommand -SqlInstance "sql-160-04.sqlserver.id" -Database "master" -File $file -SqlCredential $creds;
 
 
 
-					#$query = Get-Content "D:\Dropbox\Repositories\S4\Common\Tables\restore_log.sql" -Raw;
+	Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;	
+	Test-PsiStuff
+
+
 
 
 $query = @"
@@ -184,6 +192,21 @@ function Get-PsiConnectionString {
 	# 		things like ANSI_NULLS, ARITHABORT, and the likes. 
 	
 }
+
+
+function Test-PsiStuff {
+	
+	$file = "D:\Dropbox\Repositories\S4\Deployment\admindb_latest.sql";
+	$q = [System.IO.File]::ReadAllText($file);
+	
+	$command = [Psi.Models.Command]::FromQuery($q, "NonQuery");
+	$x = $command.GetBatches();
+	
+	Write-Host "command created";
+	Write-Host "Batches Count: $($x.Count)";	
+}
+
+
 
 # Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-PsiSql... (i quite like Invoke-PsiCmd )
 
@@ -310,7 +333,7 @@ function Invoke-PsiCommand {
 		foreach ($f in $File) {
 			try {
 				$path = Resolve-Path -Path $f;
-				$Query += [System.IO.File]::ReadAllText($path)
+				$Query += [System.IO.File]::ReadAllText($path);
 			}
 			catch {
 				"ruh roh. problem reading file contents for file [$f] -> $_ ";
@@ -320,11 +343,11 @@ function Invoke-PsiCommand {
 		if ((Array-IsPopulated $SprocName) -and (Array-IsPopulated $Query)) {
 			throw "one or the other - sproc-names or Query (file-contents).";
 		}
-		
+			
 		foreach ($q in $Query) {
 			$commands += [Psi.Models.Command]::FromQuery($q, $resultType);
 		}
-		
+			
 		foreach ($s in $SprocName) {
 			$commands += [Psi.Models.Command]::ForSproc($s, $resultType)
 		}
@@ -332,7 +355,7 @@ function Invoke-PsiCommand {
 		if ($commands.Count -lt 1) {
 			throw "Doh. No commands specified. Specify either -SprocName(s), -Query(s) ... or -File(s).";
 		}
-		
+
 		# ====================================================================================================
 		# Parameters:
 		# ====================================================================================================	
