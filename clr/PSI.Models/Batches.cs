@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace PSI.Models;
+﻿namespace PSI.Models;
 
 public class Batch
 {

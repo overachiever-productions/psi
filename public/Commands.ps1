@@ -204,7 +204,6 @@ function Get-PsiConnectionString {
 	
 }
 
-
 function Test-PsiStuff {
 	
 	$file = "D:\Dropbox\Repositories\S4\Deployment\admindb_latest.sql";
@@ -217,9 +216,7 @@ function Test-PsiStuff {
 	Write-Host "Batches Count: $($x.Count)";	
 }
 
-
-
-# Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-PsiSql... (i quite like Invoke-PsiCmd )
+# Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-Psi... (i quite like Invoke-PsiCmd )
 
 function Invoke-PsiCommand {
 	[CmdletBinding()]
@@ -346,7 +343,7 @@ function Invoke-PsiCommand {
 				$Query += [System.IO.File]::ReadAllText($path);
 			}
 			catch {
-				"ruh roh. problem reading file contents for file [$f] -> $_ ";
+				throw "ruh roh. problem reading file contents for file [$f] -> $_ ";
 			}
 		}
 		
