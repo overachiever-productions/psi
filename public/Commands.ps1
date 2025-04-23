@@ -25,12 +25,19 @@
 			-ParameterString "@myDbName sysname = $myDbName" -SqlCredential $creds;
 		$id;
 
+	PARAMS-STRING - WITH SYSNAME data-type: 
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @myParam [output];" `
+			-ParameterString "@myParam sysname = 'some sort of object name or whatever'" -SqlCredential $creds;
+
 
 	PARAMS-STRING - with VARIABLE LENGTH DATA TYPEs: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SELECT @myParam [output];" `
 			-ParameterString "@myParam varchar(12) = 'hard coded'" -SqlCredential $creds;
+
 
 	PARAMS-STRING WITH NULL INPUTs: 
 
@@ -65,14 +72,12 @@
 
 	EXCEPTION Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "RAISERROR(N'oink', 16, 1); " -SqlCredential $creds;
 
 
 	ROWCOUNT Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-		#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "admindb" -Query "DECLARE @x table (r int); INSERT INTO @x (r) VALUES (1), (2), (3);" -SqlCredential $creds;
 
@@ -123,10 +128,20 @@
 			$xmlData | ConvertTo-Xml;
 		}
 
+	COMMAND TIMEOUT EXAMPLES: 
+
+		# Hit a Timeout:
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "WAITFOR DELAY '00:00:35'; SELECT 1 [output];" -SqlCredential $creds;
+
+		# Set a CommandTimeout (and avoid operation timing out):
+		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
+		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
+		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "WAITFOR DELAY '00:00:35'; SELECT 1 [output];" -SqlCredential $creds -CommandTimeout 40;
 
 	ERRORing Example: 
 		Import-Module -Name "D:\Dropbox\Repositories\psi" -Force;
-#$global:VerbosePreference = "Continue";
 		$creds = New-Object PSCredential("sa", (ConvertTo-SecureString "Pass@word1" -AsPlainText -Force));
 		Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "meddling" -Query "PRINT 'NICE';`r`nSELECT * FROM dbo.does_not_exist" -SqlCredential $creds;
 
@@ -190,9 +205,6 @@ Invoke-PsiCommand -SqlInstance "dev.sqlserver.id" -Database "master" -Query "SEL
 
 
 
-
-
-
 #>
 
 function Get-PsiConnectionString {
@@ -203,7 +215,6 @@ function Get-PsiConnectionString {
 	# 		things like ANSI_NULLS, ARITHABORT, and the likes. 
 	
 }
-
 
 function Test-PsiStuff {
 	
@@ -217,9 +228,7 @@ function Test-PsiStuff {
 	Write-Host "Batches Count: $($x.Count)";	
 }
 
-
-
-# Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-PsiSql... (i quite like Invoke-PsiCmd )
+# Aliases (ideas/options): Invoke-PsiCmd, Invoke-Sql, Invoke-Psi... (i quite like Invoke-PsiCmd )
 
 function Invoke-PsiCommand {
 	[CmdletBinding()]
@@ -243,7 +252,6 @@ function Invoke-PsiCommand {
 		[string[]]$ParameterString = $null,
 		[int]$ConnectionTimeout = -1,
 		[int]$CommandTimeout = -1,
-		[int]$QueryTimeout = -1,
 		[Alias("AppName")]
 		[string]$ApplicationName = "PSI.Command",		# TODO: possibly use "reflection" to get module version and shove it in to app name? e.g., "PSI.Command (1.2)"
 #		[ValidateSet("AUTO", "System", "Microsoft")]
@@ -347,7 +355,7 @@ function Invoke-PsiCommand {
 				$Query += [System.IO.File]::ReadAllText($path);
 			}
 			catch {
-				"ruh roh. problem reading file contents for file [$f] -> $_ ";
+				throw "ruh roh. problem reading file contents for file [$f] -> $_ ";
 			}
 		}
 		
@@ -412,7 +420,6 @@ function Invoke-PsiCommand {
 								foreach ($batch in $command.GetBatches()) {
 									$connection.ConnectionTimeout = $ConnectionTimeout;
 									$connection.CommandTimeout = $CommandTimeout;
-									$connection.QueryTimeout = $QueryTimeout;
 									
 									$connection.Encrypt = $Encrypt;
 									$connection.TrustServerCertificate = $TrustServerCert;

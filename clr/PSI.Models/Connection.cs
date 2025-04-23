@@ -14,7 +14,6 @@ public class Connection : ICloneable<Connection>
 
     public int ConnectionTimeout { get; set; } = -1;
     public int CommandTimeout { get; set; } = -1;
-    public int QueryTimeout { get; set; } = -1;
 
     public bool Encrypt { get; set; } = false;
     public bool TrustServerCertificate { get; set; } = false;
@@ -67,7 +66,6 @@ public class Connection : ICloneable<Connection>
         
         output.ConnectionTimeout = this.ConnectionTimeout;
         output.CommandTimeout = this.CommandTimeout;
-        output.QueryTimeout = this.QueryTimeout;
 
         output.Encrypt = this.Encrypt;
         output.TrustServerCertificate = this.TrustServerCertificate;

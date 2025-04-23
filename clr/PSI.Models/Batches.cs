@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace PSI.Models;
+﻿namespace PSI.Models;
 
 public class Batch
 {
@@ -57,7 +55,6 @@ public class BatchResult
 
     public int ConnectionTimeout { get; private set; }
     public int CommandTimeout { get; private set; }
-    public int QueryTimeout { get; private set; }
 
     // TODO: 
     // Connection OPTIONS: MultiSubnet, Encrypt, TrustServerCert, AppIntent (readonly), etc... 
@@ -116,12 +113,12 @@ public class BatchResult
             this.Login = userName;
         else 
             this.Login = connection.Credential.UserName;
+
         this.ApplicationName = connection.ApplicationName;
         this.BatchNumber = batchNumber;
 
         this.ConnectionTimeout = connection.ConnectionTimeout;
         this.CommandTimeout = connection.CommandTimeout;
-        this.QueryTimeout = connection.QueryTimeout;
 
         this.Options = options;
     }

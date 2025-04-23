@@ -36,8 +36,8 @@ public class Command
         var tokenizer = new Tokenizer(this.CommandText);
         tokenizer.Initialize();
         tokenizer.Tokenize();
-        //foreach (var parsedBatch in tokenizer.GetParsedBatches(true))
-        //    output.Add(new Batch(this.CommandType, this.ResultType, parsedBatch.BatchText, parsedBatch));
+        foreach (var parsedBatch in tokenizer.GetParsedBatches(true))
+            output.Add(new Batch(this.CommandType, this.ResultType, parsedBatch.BatchText, parsedBatch));
 
         return output;
     }
