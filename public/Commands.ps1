@@ -243,7 +243,6 @@ function Invoke-PsiCommand {
 		[string[]]$ParameterString = $null,
 		[int]$ConnectionTimeout = -1,
 		[int]$CommandTimeout = -1,
-		[int]$QueryTimeout = -1,
 		[Alias("AppName")]
 		[string]$ApplicationName = "PSI.Command",		# TODO: possibly use "reflection" to get module version and shove it in to app name? e.g., "PSI.Command (1.2)"
 #		[ValidateSet("AUTO", "System", "Microsoft")]
@@ -412,7 +411,6 @@ function Invoke-PsiCommand {
 								foreach ($batch in $command.GetBatches()) {
 									$connection.ConnectionTimeout = $ConnectionTimeout;
 									$connection.CommandTimeout = $CommandTimeout;
-									$connection.QueryTimeout = $QueryTimeout;
 									
 									$connection.Encrypt = $Encrypt;
 									$connection.TrustServerCertificate = $TrustServerCert;
